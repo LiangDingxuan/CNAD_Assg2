@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    networks:
+      - app-network
+
+  # Redis Service
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  # Account Service
+  account-service:
+    build: ./Account_service
+    container_name: account-service
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://root:example@mongodb:27017/account_service?authSource=admin
+      - REDIS_URI=redis://redis:6379
+      - JWT_SECRET=your_jwt_secret_key
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - app-network
+
+  # Task Service
+  task-service:
+    build: ./Task_service
+    container_name: task-service
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://root:example@mongodb:27017/task_service?authSource=admin
+      - REDIS_URI=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - app-network
+
+  # Frontend Service
+  frontend:
+    build: ./Frontend_service
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_ACCOUNT_SERVICE_URL=http://localhost:3001
+      - REACT_APP_TASK_SERVICE_URL=http://localhost:3002
+    depends_on:
+      - account-service
+      - task-service
+    networks:
+      - app-network
+
+# Volumes
+volumes:
+  mongodb_data:
+  redis_data:
+
+# Networks
+networks:
+  app-network:
+    driver: bridge
