@@ -37,3 +37,8 @@ Each service has its own directory with its own `package.json` and dependencies.
 ### Environment Variables
 
 Create `.env` files in each service directory as needed. See `.env.example` files for reference.
+
+## Database Schema
+
+# Database Schema
+
