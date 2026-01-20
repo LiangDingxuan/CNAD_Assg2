@@ -5,9 +5,9 @@ yarn.lock
 claude.md
 
 # Environment variables
-.env
-.env.*
-!.env.example
+#.env
+#.env.*
+#!.env.example
 
 # Build outputs
 build/
@@ -30,9 +30,9 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-**/Dockerfile
-**/docker-compose*.yml
-**/.dockerignore
+#**/Dockerfile
+#**/docker-compose*.yml
+#**/.dockerignore
 
 # Database files
 *.sqlite
