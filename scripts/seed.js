@@ -3,7 +3,8 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 
 // Load environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.DB_NAME || 'taskmanager';
+const TASK_DB_NAME = process.env.TASK_DB_NAME || 'Task';
+const ACCOUNT_DB_NAME = process.env.ACCOUNT_DB_NAME || 'account';
 
 if (!MONGODB_URI) {
   console.error('Error: MONGODB_URI is not defined in .env file');
@@ -28,33 +29,43 @@ const sampleUsers = [
   }
 ];
 
+const { ObjectId } = require('mongodb');
+
 const sampleTasks = [
   { 
-    title: 'Complete project setup', 
-    description: 'Set up the initial project structure and configurations',
-    status: 'in-progress', 
-    priority: 'high',
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-    assignedTo: 'user1',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    _id: new ObjectId(),
+    name: 'Morning Medication',
+    description: 'Take prescribed morning medication with water',
+    status: 'completed',
+    time_taken: 5
   },
   { 
-    title: 'Write documentation', 
-    description: 'Document the API endpoints and setup instructions',
-    status: 'todo', 
-    priority: 'medium',
-    assignedTo: 'admin',
-    createdAt: new Date(),
-    updatedAt: new Date()
+    _id: new ObjectId(),
+    name: 'Breakfast',
+    description: 'Prepare and eat breakfast',
+    status: 'completed',
+    time_taken: 20
   },
   { 
-    title: 'Test API endpoints', 
-    description: 'Create and run tests for all API endpoints',
-    status: 'todo', 
-    priority: 'high',
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    assignedTo: 'user1',
+    _id: new ObjectId(),
+    name: 'Brush Teeth',
+    description: 'Brush teeth for 2 minutes',
+    status: 'snoozed',
+    time_taken: 0
+  },
+  { 
+    _id: new ObjectId(),
+    name: 'Lunch',
+    description: 'Prepare and eat lunch',
+    status: 'pending',
+    time_taken: 0
+  },
+  { 
+    _id: new ObjectId(),
+    name: 'Evening Medication',
+    description: 'Take prescribed evening medication with water',
+    status: 'pending',
+    time_taken: 0,
     createdAt: new Date(),
     updatedAt: new Date()
   }
@@ -75,31 +86,33 @@ async function seedDatabase() {
     await client.connect();
     console.log('Successfully connected to MongoDB!');
     
-    const db = client.db(DB_NAME);
+    // Connect to Account database for users
+    const accountDb = client.db(ACCOUNT_DB_NAME);
+    const taskDb = client.db(TASK_DB_NAME);
     
     // Drop existing collections if they exist (optional, for clean seed)
-    await db.collection('users').drop().catch(() => console.log('Users collection does not exist, creating new one...'));
-    await db.collection('tasks').drop().catch(() => console.log('Tasks collection does not exist, creating new one...'));
+    await accountDb.collection('users').drop().catch(() => console.log('Users collection does not exist, creating new one...'));
+    await taskDb.collection('tasks').drop().catch(() => console.log('Tasks collection does not exist, creating new one...'));
     
-    // Insert sample users
-    const usersCollection = db.collection('users');
+    // Insert sample users into Account database
+    const usersCollection = accountDb.collection('users');
     const usersResult = await usersCollection.insertMany(sampleUsers);
-    console.log(`✅ Successfully inserted ${usersResult.insertedCount} users`);
+    console.log(`✅ Successfully inserted ${usersResult.insertedCount} users into ${ACCOUNT_DB_NAME} database`);
     
-    // Insert sample tasks
-    const tasksCollection = db.collection('tasks');
+    // Insert sample tasks into Task database
+    const tasksCollection = taskDb.collection('tasks');
     const tasksResult = await tasksCollection.insertMany(sampleTasks);
-    console.log(`✅ Successfully inserted ${tasksResult.insertedCount} tasks`);
+    console.log(`✅ Successfully inserted ${tasksResult.insertedCount} tasks into ${TASK_DB_NAME} database`);
     
     // Create indexes
     await usersCollection.createIndex({ username: 1 }, { unique: true });
     await usersCollection.createIndex({ email: 1 }, { unique: true });
-    await tasksCollection.createIndex({ assignedTo: 1 });
     await tasksCollection.createIndex({ status: 1 });
     
-    console.log('\n🎉 Database seeded successfully!');
+    console.log('\n🎉 Databases seeded successfully!');
     console.log('🔗 MongoDB URI:', MONGODB_URI.replace(/\/\/([^:]+):[^@]+@/, '//$1:****@'));
-    console.log('📊 Database:', DB_NAME);
+    console.log('📊 Account Database:', ACCOUNT_DB_NAME);
+    console.log('📊 Task Database:', TASK_DB_NAME);
     
   } catch (error) {
     console.error('❌ Error seeding database:');
