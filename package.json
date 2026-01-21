@@ -1,16 +1,31 @@
 {
   "name": "cnad_assg2",
   "version": "1.0.0",
-  "description": "This is a microservices-based application with the following services:",
+  "description": "Microservices-based application with user accounts and task management",
   "main": "index.js",
   "scripts": {
+    "db:schema": "node scripts/db-schema.js",
+    "db:seed": "node scripts/seed.js",
+    "docs:update": "node scripts/update-readme.js",
+    "docs:all": "npm run db:schema && npm run docs:update",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "microservices",
+    "mongodb",
+    "nodejs",
+    "react"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^17.2.3",
     "mongodb": "^6.21.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "uuid": "^13.0.0"
   }
 }

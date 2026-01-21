@@ -1,13 +1,19 @@
-FROM node:16-alpine
+# task_service/Dockerfile
+FROM node:18-alpine
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
+# Copy package files
 COPY package*.json ./
 
-RUN npm install
+# Install dependencies
+RUN npm install --production
 
+# Copy application code
 COPY . .
 
-EXPOSE 3000
+# Expose the port the app runs on
+EXPOSE 3002
 
-CMD ["npm", "start"]
+# Command to run the application
+CMD ["node", "index.js"]
