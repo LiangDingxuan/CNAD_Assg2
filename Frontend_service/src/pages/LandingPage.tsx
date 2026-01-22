@@ -47,17 +47,17 @@ export function LandingPage() {
           icon={<Users className="size-16" />}
           title="Staff Dashboard"
           description="Monitor residents, view analytics, manage alerts and vouchers"
-          buttonText="Enter Staff Dashboard"
+          buttonText="Login to Staff Dashboard"
           buttonClassName="w-full"
-          to="/staff"
+          to="/login?role=staff"
         />
         <InterfaceCard
           icon={<User className="size-16" />}
           title="Resident Interface"
           description="View your tasks, track progress, earn rewards and redeem vouchers"
-          buttonText="Enter Resident Interface"
+          buttonText="Login to Resident Interface"
           buttonClassName="w-full bg-purple-600 hover:bg-purple-700 text-white"
-          to="/resident"
+          to="/login?role=resident"
         />
       </div>
     </div>
