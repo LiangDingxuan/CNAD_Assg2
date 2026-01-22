@@ -88,6 +88,64 @@ const sampleTasks = [
   }
 ];
 
+// Sample schedule data
+const sampleSchedules = [
+  {
+    _id: new ObjectId(),
+    taskId: sampleTasks[0]._id, // Morning Medication
+    userId: null, // Can be linked to specific user if needed
+    type: 'daily',
+    time: '08:00',
+    days: [1, 2, 3, 4, 5, 6, 7], // 1 = Monday, 7 = Sunday
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    _id: new ObjectId(),
+    taskId: sampleTasks[1]._id, // Breakfast
+    userId: null,
+    type: 'daily',
+    time: '08:30',
+    days: [1, 2, 3, 4, 5, 6, 7],
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    _id: new ObjectId(),
+    taskId: sampleTasks[2]._id, // Brush Teeth
+    userId: null,
+    type: 'daily',
+    time: '08:45',
+    days: [1, 2, 3, 4, 5, 6, 7],
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    _id: new ObjectId(),
+    taskId: sampleTasks[3]._id, // Lunch
+    userId: null,
+    type: 'daily',
+    time: '12:30',
+    days: [1, 2, 3, 4, 5, 6, 7],
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    _id: new ObjectId(),
+    taskId: sampleTasks[4]._id, // Evening Medication
+    userId: null,
+    type: 'daily',
+    time: '20:00',
+    days: [1, 2, 3, 4, 5, 6, 7],
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+];
 async function seedDatabase() {
   const client = new MongoClient(MONGODB_URI, {
     serverApi: {
@@ -103,10 +161,14 @@ async function seedDatabase() {
 
     const accountDb = client.db(ACCOUNT_DB_NAME);
     const taskDb = client.db(TASK_DB_NAME);
-
-    await accountDb.collection('users').drop().catch(() => console.log('Users collection does not exist, creating new one.'));
-    await taskDb.collection('tasks').drop().catch(() => console.log('Tasks collection does not exist, creating new one.'));
-
+    
+    // Drop existing collections if they exist (optional, for clean seed)
+    await accountDb.collection('users').drop().catch(() => console.log('Users collection does not exist, creating new one...'));
+    await taskDb.collection('tasks').drop().catch(() => console.log('Tasks collection does not exist, creating new one...'));
+    await taskDb.collection('schedules').drop().catch(() =>console.log('Schedules collection does not exist, creating new one...')
+);
+    
+    // Insert sample users into Account database
     const usersCollection = accountDb.collection('users');
     const usersResult = await usersCollection.insertMany(sampleUsers);
     console.log(`✅ Successfully inserted ${usersResult.insertedCount} users into ${ACCOUNT_DB_NAME} database`);
@@ -115,6 +177,11 @@ async function seedDatabase() {
     const tasksResult = await tasksCollection.insertMany(sampleTasks);
     console.log(`✅ Successfully inserted ${tasksResult.insertedCount} tasks into ${TASK_DB_NAME} database`);
 
+    const schedulesCollection = taskDb.collection('schedules');
+const schedulesResult = await schedulesCollection.insertMany(sampleSchedules);
+console.log(`✅ Successfully inserted ${schedulesResult.insertedCount} schedules into ${TASK_DB_NAME} database`);
+    
+    // Create indexes
     await usersCollection.createIndex({ username: 1 }, { unique: true });
     await usersCollection.createIndex({ email: 1 }, { unique: true });
     await usersCollection.createIndex({ role: 1 });

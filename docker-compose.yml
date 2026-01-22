@@ -45,6 +45,24 @@ services:
     networks:
       - app-network
 
+  # Alert Service
+  alert-service:
+    build: ./alert_service
+    container_name: alert-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - MONGODB_URI=${MONGODB_URI}
+    depends_on:
+      - mongo
+      - task-service
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # MongoDB
   mongo:
     image: mongo:6.0
     container_name: mongodb
@@ -54,6 +72,7 @@ services:
       - mongodb_data:/data/db
     networks:
       - app-network
+    restart: unless-stopped
 
 networks:
   app-network:
