@@ -55,9 +55,9 @@ export function LandingPage() {
           icon={<User className="size-16" />}
           title="Resident Interface"
           description="View your tasks, track progress, earn rewards and redeem vouchers"
-          buttonText="Login to Resident Interface"
+          buttonText="Enter Resident Interface"
           buttonClassName="w-full bg-purple-600 hover:bg-purple-700 text-white"
-          to="/login?role=resident"
+          to="/resident"
         />
       </div>
     </div>
