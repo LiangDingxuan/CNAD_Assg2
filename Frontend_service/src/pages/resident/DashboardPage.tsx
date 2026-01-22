@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Flame, Star, CheckCircle2, Calendar } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { ResidentHeader } from '@/components/resident/ResidentHeader'
 import { MetricCard } from '@/components/resident/MetricCard'
 import { TaskCard } from '@/components/resident/TaskCard'
@@ -40,11 +41,13 @@ export function ResidentDashboardPage() {
             icon={<Flame className="size-6 text-orange-500" />}
             label="Streak"
             value={`${user.streak} days`}
+            variant="streak"
           />
           <MetricCard
             icon={<Star className="size-6 text-yellow-500" />}
             label="Total Points"
             value={user.points}
+            variant="points"
           />
           <MetricCard
             icon={<CheckCircle2 className="size-6 text-green-500" />}
@@ -53,6 +56,8 @@ export function ResidentDashboardPage() {
             variant="completed"
           />
         </div>
+
+        <Separator className="mb-6" />
 
         <div className="grid grid-cols-3 gap-4">
           {upcomingTasks.map((task) => (
