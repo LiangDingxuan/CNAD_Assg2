@@ -18,14 +18,14 @@ const variantStyles = {
 export function MetricCard({ icon, label, value, variant = 'default' }: MetricCardProps) {
   return (
     <Card className={cn(
-      'flex-1',
+      'flex-1 py-2',
       variantStyles[variant]
     )}>
-      <CardContent className="flex items-center gap-4 py-4 px-6">
+      <CardContent className="flex items-center gap-4 py-3 px-5">
         <div className="text-2xl">{icon}</div>
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-xl font-bold">{value}</p>
         </div>
       </CardContent>
     </Card>
