@@ -6,17 +6,20 @@ import type { TabletTask } from '@/types/resident'
 
 interface TaskCardProps {
   task: TabletTask
+  onClick?: () => void
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, onClick }: TaskCardProps) {
   const isCompleted = task.status === 'completed'
 
   return (
     <Card
       className={cn(
         'transition-all',
-        isCompleted && 'bg-green-900/20 border-green-800'
+        isCompleted && 'bg-green-900/20 border-green-800',
+        !isCompleted && 'cursor-pointer hover:border-primary/50'
       )}
+      onClick={!isCompleted ? onClick : undefined}
     >
       <CardContent className="py-4 px-5">
         <div className="flex items-start justify-between">

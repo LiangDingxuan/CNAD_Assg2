@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Flame, Star, CheckCircle2, Calendar } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -6,15 +6,41 @@ import { Separator } from '@/components/ui/separator'
 import { ResidentHeader } from '@/components/resident/ResidentHeader'
 import { MetricCard } from '@/components/resident/MetricCard'
 import { TaskCard } from '@/components/resident/TaskCard'
+import { AlarmModal } from '@/components/resident/AlarmModal'
 import { getUserById, getTasksForUser } from '@/data/mockHousehold'
+import type { AlarmData } from '@/types/alert'
+import type { TabletTask } from '@/types/resident'
 
 export function ResidentDashboardPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [alarmOpen, setAlarmOpen] = useState(false)
+  const [alarmData, setAlarmData] = useState<AlarmData | null>(null)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const userId = searchParams.get('user') || ''
   const user = getUserById(userId)
   const tasks = getTasksForUser(userId)
+
+  // Simulates a cron-triggered alarm by clicking a task card.
+  // TODO: Replace with alert service polling/WebSocket when ready.
+  const handleTaskClick = useCallback((task: TabletTask) => {
+    setAlarmData({
+      taskName: task.name,
+      taskIcon: task.icon,
+      scheduledTime: task.scheduledTime,
+    })
+    setAlarmOpen(true)
+  }, [])
+
+  const handleSnooze = useCallback(() => {
+    // TODO: Call snoozeAlert(scheduleId) when alert service is ready
+    setAlarmOpen(false)
+  }, [])
+
+  const handleComplete = useCallback(() => {
+    // TODO: Call completeAlert(scheduleId) when alert service is ready
+    setAlarmOpen(false)
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -61,7 +87,7 @@ export function ResidentDashboardPage() {
 
         <div className="grid grid-cols-3 gap-4">
           {upcomingTasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} onClick={() => handleTaskClick(task)} />
           ))}
           {completedTasks.map((task) => (
             <TaskCard key={task.id} task={task} />
@@ -81,6 +107,13 @@ export function ResidentDashboardPage() {
           </Badge>
         </div>
       </footer>
+
+      <AlarmModal
+        open={alarmOpen}
+        alarm={alarmData}
+        onSnooze={handleSnooze}
+        onComplete={handleComplete}
+      />
     </div>
   )
 }
