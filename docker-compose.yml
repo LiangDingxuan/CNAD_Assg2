@@ -23,11 +23,9 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - MONGODB_URI=mongodb://mongo:27017
-      - TASK_DB_NAME=${TASK_DB_NAME:-Task}
+      - MONGODB_URI=mongodb+srv://liangdingxuan_db_user:8TTH27WozKMVs9s7@cluster0.dendyxq.mongodb.net/Task?retryWrites=true&w=majority
+      - TASK_DB_NAME=Task
       - TASK_SERVICE_PORT=3002
-    depends_on:
-      - mongo
     networks:
       - app-network
 
@@ -56,23 +54,22 @@ services:
       - PORT=3003
       - MONGODB_URI=${MONGODB_URI}
     depends_on:
-      - mongo
       - task-service
     networks:
       - app-network
     restart: unless-stopped
 
   # MongoDB
-  mongo:
-    image: mongo:6.0
-    container_name: mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - app-network
-    restart: unless-stopped
+ # mongo:
+  #  image: mongo:6.0
+  # container_name: mongodb
+  #  ports:
+  #    - "27017:27017"
+  #  volumes:
+  #    - mongodb_data:/data/db
+  #  networks:
+  #    - app-network
+  #  restart: unless-stopped
 
 networks:
   app-network:
