@@ -52,7 +52,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3003
-      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_URI=mongodb+srv://liangdingxuan_db_user:8TTH27WozKMVs9s7@cluster0.dendyxq.mongodb.net/Task?retryWrites=true&w=majority
     depends_on:
       - task-service
     networks:
