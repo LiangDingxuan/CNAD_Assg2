@@ -43,7 +43,7 @@ export function ResidentHeader({ currentUser, currentTime }: ResidentHeaderProps
   }
 
   return (
-    <header className="flex items-center justify-between px-6 py-4">
+    <header className="flex items-center justify-between px-6 py-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const { connectDB } = require('./config/db');
 const authRoutes = require('./routes/auth.routes');
@@ -17,7 +18,17 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 
-connectDB().then(() => {
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message || err);
+  res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' } });
+});
+
+connectDB().then(async () => {
+  const User = require('./models/user.model');
+  // Drop stale non-sparse email index if it exists, then rebuild
+  try { await User.collection.dropIndex('email_1'); } catch (e) { /* index may not exist */ }
+  await User.syncIndexes();
   app.listen(PORT, () => {
     console.log(`Account Service running on port ${PORT}`);
   });

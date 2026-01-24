@@ -6,29 +6,32 @@ import type { TabletTask } from '@/types/resident'
 
 interface TaskCardProps {
   task: TabletTask
+  onClick?: () => void
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, onClick }: TaskCardProps) {
   const isCompleted = task.status === 'completed'
 
   return (
     <Card
       className={cn(
-        'transition-all',
-        isCompleted && 'bg-green-900/20 border-green-800'
+        'transition-all py-2',
+        isCompleted && 'bg-green-900/20 border-green-800',
+        !isCompleted && 'cursor-pointer hover:border-primary/50'
       )}
+      onClick={!isCompleted ? onClick : undefined}
     >
-      <CardContent className="py-4 px-5">
+      <CardContent className="py-3 px-4">
         <div className="flex items-start justify-between">
-          <span className="text-3xl">{task.icon}</span>
+          <span className="text-2xl">{task.icon}</span>
           {isCompleted && (
             <Badge variant="outline" className="border-green-700 text-green-500">
               <CheckCircle2 className="size-4" />
             </Badge>
           )}
         </div>
-        <h3 className="font-semibold mt-3">{task.name}</h3>
-        <div className="flex items-center gap-1 text-muted-foreground text-sm mt-2">
+        <h3 className="font-semibold mt-1">{task.name}</h3>
+        <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
           <Clock className="size-4" />
           <span>{task.scheduledTime}</span>
         </div>
