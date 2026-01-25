@@ -47,9 +47,9 @@ export function LandingPage() {
           icon={<Users className="size-16" />}
           title="Staff Dashboard"
           description="Monitor residents, view analytics, manage alerts and vouchers"
-          buttonText="Enter Staff Dashboard"
+          buttonText="Login to Staff Dashboard"
           buttonClassName="w-full"
-          to="/staff"
+          to="/login?role=staff"
         />
         <InterfaceCard
           icon={<User className="size-16" />}
