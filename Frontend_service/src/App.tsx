@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { LandingPage } from '@/pages/LandingPage'
 import { DashboardPage } from '@/pages/staff/DashboardPage'
 import { ResidentDetailsPage } from '@/pages/staff/ResidentDetailsPage'
+import KitchenMonitoringPage from '@/pages/staff/KitchenMonitoringPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RequireAuth } from '@/components/RequireAuth'
 import { ProfileSelectPage } from '@/pages/resident/ProfileSelectPage'
@@ -28,6 +29,14 @@ function App() {
         element={
           <RequireAuth allowedRoles={['staff', 'admin']}>
             <ResidentDetailsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/staff/kitchen"
+        element={
+          <RequireAuth allowedRoles={['staff', 'admin']}>
+            <KitchenMonitoringPage />
           </RequireAuth>
         }
       />

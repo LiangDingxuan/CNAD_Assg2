@@ -37,9 +37,11 @@ services:
     environment:
       - VITE_ACCOUNT_API=http://localhost:3001
       - VITE_TASK_API=http://localhost:3002
+      - VITE_VIDEO_SERVICE_URL=ws://localhost:3004
     depends_on:
       - account-service
       - task-service
+      - video-service
     networks:
       - app-network
 
@@ -58,6 +60,25 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+
+  # Video Streaming Service
+  video-service:
+    build: ./video_service
+    container_name: video-service
+    ports:
+      - "3004:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongo:27017
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+    restart: unless-stopped
+    volumes:
+      - ./video_service/src:/app/src
+      - /app/node_modules
 
   # MongoDB
   mongo:

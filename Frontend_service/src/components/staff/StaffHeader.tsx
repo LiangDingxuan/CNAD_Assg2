@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutGrid, Bell, Ticket, BarChart3 } from 'lucide-react'
+import { LayoutGrid, Bell, Ticket, BarChart3, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
@@ -42,6 +42,7 @@ export function StaffHeader() {
           <NavTab label="Overview" to="/staff" icon={<LayoutGrid className="size-4" />} />
           <NavTab label="Alerts" to="/staff/alerts" icon={<Bell className="size-4" />} badge={4} />
           <NavTab label="Vouchers" to="/staff/vouchers" icon={<Ticket className="size-4" />} />
+          <NavTab label="Kitchen" to="/staff/kitchen" icon={<Camera className="size-4" />} />
           <NavTab label="Analytics" to="/staff/analytics" icon={<BarChart3 className="size-4" />} />
         </nav>
       </div>
