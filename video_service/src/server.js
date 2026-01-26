@@ -4,10 +4,7 @@ import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { MongoClient } from 'mongodb';
-import * as tf from '@tensorflow/tfjs-node';
-import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import sharp from 'sharp';
-import { RTSPStream } from 'node-rtsp-stream';
 
 dotenv.config();
 
@@ -38,17 +35,6 @@ async function connectToMongoDB() {
   }
 }
 
-// AI Model
-let model;
-async function loadModel() {
-  try {
-    model = await cocoSsd.load();
-    console.log('AI Model loaded successfully');
-  } catch (error) {
-    console.error('Error loading AI model:', error);
-  }
-}
-
 // WebSocket connections
 const clients = new Set();
 
@@ -60,8 +46,14 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message);
       
-      if (data.type === 'video_frame') {
-        await processVideoFrame(data.image, ws);
+      if (data.type === 'detection_result') {
+        await saveDetectionResult(data.dishStatus, data.predictions);
+        // Broadcast to all other clients
+        clients.forEach(client => {
+          if (client !== ws && client.readyState === 1) {
+            client.send(JSON.stringify(data));
+          }
+        });
       } else if (data.type === 'get_detection_history') {
         await sendDetectionHistory(ws);
       }
@@ -81,107 +73,6 @@ wss.on('connection', (ws) => {
     clients.delete(ws);
   });
 });
-
-// Process video frame for dish detection
-async function processVideoFrame(base64Image, clientWs) {
-  try {
-    if (!model) {
-      console.log('Model not loaded yet');
-      return;
-    }
-
-    // Convert base64 to buffer
-    const imageBuffer = Buffer.from(base64Image, 'base64');
-    
-    // Resize image for better performance
-    const resizedBuffer = await sharp(imageBuffer)
-      .resize(640, 480)
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    // Decode image for TensorFlow
-    const image = tf.node.decodeImage(resizedBuffer, 3);
-    
-    // Run object detection
-    const predictions = await model.detect(image);
-    
-    // Analyze predictions for dish completion
-    const dishStatus = analyzeDishStatus(predictions);
-    
-    // Save detection result
-    await saveDetectionResult(dishStatus, predictions);
-    
-    // Send result back to client
-    const result = {
-      type: 'detection_result',
-      timestamp: new Date().toISOString(),
-      dishStatus,
-      predictions: predictions.map(p => ({
-        class: p.class,
-        score: p.score,
-        bbox: p.bbox
-      }))
-    };
-    
-    clientWs.send(JSON.stringify(result));
-    
-    // Broadcast to all other clients
-    clients.forEach(client => {
-      if (client !== clientWs && client.readyState === 1) {
-        client.send(JSON.stringify(result));
-      }
-    });
-    
-    // Clean up tensor
-    image.dispose();
-    
-  } catch (error) {
-    console.error('Error processing video frame:', error);
-    clientWs.send(JSON.stringify({ 
-      type: 'error', 
-      message: 'Failed to process frame' 
-    }));
-  }
-}
-
-// Analyze dish status based on predictions
-function analyzeDishStatus(predictions) {
-  const dishClasses = ['bowl', 'plate', 'cup', 'fork', 'knife', 'spoon', 'food'];
-  const relevantPredictions = predictions.filter(p => 
-    dishClasses.some(cls => p.class.toLowerCase().includes(cls))
-  );
-  
-  // Simple logic for dish completion detection
-  const hasFood = relevantPredictions.some(p => p.class.toLowerCase().includes('food'));
-  const hasUtensils = relevantPredictions.some(p => 
-    ['fork', 'knife', 'spoon'].some(utensil => p.class.toLowerCase().includes(utensil))
-  );
-  const hasDishware = relevantPredictions.some(p => 
-    ['bowl', 'plate', 'cup'].some(dish => p.class.toLowerCase().includes(dish))
-  );
-  
-  let status = 'empty';
-  if (hasFood && hasUtensils && hasDishware) {
-    status = 'completed';
-  } else if (hasFood && hasDishware) {
-    status = 'in_progress';
-  } else if (hasDishware) {
-    status = 'preparing';
-  }
-  
-  return {
-    status,
-    confidence: calculateConfidence(relevantPredictions),
-    items: relevantPredictions.map(p => p.class)
-  };
-}
-
-// Calculate confidence score
-function calculateConfidence(predictions) {
-  if (predictions.length === 0) return 0;
-  const avgScore = predictions.reduce((sum, p) => sum + p.score, 0) / predictions.length;
-  return Math.round(avgScore * 100);
-}
 
 // Save detection result to database
 async function saveDetectionResult(dishStatus, predictions) {
@@ -242,7 +133,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'running',
     clients: clients.size,
-    modelLoaded: !!model
+    aiProcessing: 'client-side'
   });
 });
 
@@ -272,7 +163,6 @@ app.get('/api/detection-history', async (req, res) => {
 // Initialize services
 async function initialize() {
   await connectToMongoDB();
-  await loadModel();
 }
 
 // Start server

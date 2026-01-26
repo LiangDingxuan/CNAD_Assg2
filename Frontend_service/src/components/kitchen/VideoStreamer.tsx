@@ -12,6 +12,8 @@ import {
   Play,
   Pause
 } from 'lucide-react';
+import * as tf from '@tensorflow/tfjs';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 interface DetectionResult {
   type: 'detection_result';
@@ -48,8 +50,29 @@ const VideoStreamer: React.FC = () => {
   const [detectionHistory, setDetectionHistory] = useState<DetectionHistory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null);
+  const [isModelLoading, setIsModelLoading] = useState(true);
 
-  const WEBSOCKET_URL = import.meta.env.VITE_VIDEO_SERVICE_URL || 'ws://localhost:3001';
+  const WEBSOCKET_URL = import.meta.env.VITE_VIDEO_SERVICE_URL || 'ws://localhost:3004';
+
+  // Load AI model
+  useEffect(() => {
+    const loadModel = async () => {
+      try {
+        await tf.ready();
+        const loadedModel = await cocoSsd.load();
+        setModel(loadedModel);
+        setIsModelLoading(false);
+        console.log('AI Model loaded successfully');
+      } catch (error) {
+        console.error('Error loading AI model:', error);
+        setIsModelLoading(false);
+        setError('Failed to load AI model');
+      }
+    };
+
+    loadModel();
+  }, []);
 
   // Initialize WebSocket connection
   const initializeWebSocket = useCallback(() => {
@@ -67,9 +90,8 @@ const VideoStreamer: React.FC = () => {
         try {
           const data = JSON.parse(event.data);
           
-          if (data.type === 'detection_result') {
-            setDetectionResult(data);
-            setDetectionHistory(prev => [data.dishStatus, ...prev.slice(0, 9)]);
+          if (data.type === 'detection_history') {
+            setDetectionHistory(data.data);
           } else if (data.type === 'error') {
             setError(data.message);
           }
@@ -134,39 +156,92 @@ const VideoStreamer: React.FC = () => {
     setIsStreaming(false);
   };
 
+  // Analyze dish status based on predictions
+  const analyzeDishStatus = useCallback((predictions: cocoSsd.DetectedObject[]) => {
+    const dishClasses = ['bowl', 'plate', 'cup', 'fork', 'knife', 'spoon', 'food'];
+    const relevantPredictions = predictions.filter(p => 
+      dishClasses.some(cls => p.class.toLowerCase().includes(cls))
+    );
+    
+    // Simple logic for dish completion detection
+    const hasFood = relevantPredictions.some(p => p.class.toLowerCase().includes('food'));
+    const hasUtensils = relevantPredictions.some(p => 
+      ['fork', 'knife', 'spoon'].some(utensil => p.class.toLowerCase().includes(utensil))
+    );
+    const hasDishware = relevantPredictions.some(p => 
+      ['bowl', 'plate', 'cup'].some(dish => p.class.toLowerCase().includes(dish))
+    );
+    
+    let status: 'empty' | 'preparing' | 'in_progress' | 'completed' = 'empty';
+    if (hasFood && hasUtensils && hasDishware) {
+      status = 'completed';
+    } else if (hasFood && hasDishware) {
+      status = 'in_progress';
+    } else if (hasDishware) {
+      status = 'preparing';
+    }
+    
+    return {
+      status,
+      confidence: calculateConfidence(relevantPredictions),
+      items: relevantPredictions.map(p => p.class)
+    };
+  }, []);
+
+  // Calculate confidence score
+  const calculateConfidence = useCallback((predictions: cocoSsd.DetectedObject[]) => {
+    if (predictions.length === 0) return 0;
+    const avgScore = predictions.reduce((sum, p) => sum + p.score, 0) / predictions.length;
+    return Math.round(avgScore * 100);
+  }, []);
+
+  // Process video frame for dish detection
+  const processVideoFrame = useCallback(async (imageElement: HTMLVideoElement) => {
+    if (!model || isModelLoading) return;
+
+    try {
+      const predictions = await model.detect(imageElement);
+      const dishStatus = analyzeDishStatus(predictions);
+      
+      const result: DetectionResult = {
+        type: 'detection_result',
+        timestamp: new Date().toISOString(),
+        dishStatus,
+        predictions: predictions.map((p: cocoSsd.DetectedObject) => ({
+          class: p.class,
+          score: p.score,
+          bbox: p.bbox
+        }))
+      };
+      
+      setDetectionResult(result);
+      setDetectionHistory(prev => [{
+        timestamp: new Date().toISOString(),
+        ...dishStatus
+      }, ...prev.slice(0, 9)]);
+      
+      // Send result to server for storage
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(result));
+      }
+      
+    } catch (error) {
+      console.error('Error processing frame:', error);
+    }
+  }, [model, isModelLoading, analyzeDishStatus]);
+
   // Capture and send frame for analysis
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current || !wsRef.current || 
-        !isStreaming || isPaused || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!videoRef.current || !model || isModelLoading || 
+        !isStreaming || isPaused) {
       return;
     }
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    if (!context || video.readyState !== 4) {
-      return;
-    }
-
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Convert to base64 and send to server
-    const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    processVideoFrame(videoRef.current);
     
-    wsRef.current.send(JSON.stringify({
-      type: 'video_frame',
-      image: base64Image
-    }));
-
     // Schedule next frame capture
     animationFrameRef.current = requestAnimationFrame(captureFrame);
-  }, [isStreaming, isPaused]);
+  }, [isStreaming, isPaused, model, isModelLoading, processVideoFrame]);
 
   // Initialize WebSocket on component mount
   useEffect(() => {
