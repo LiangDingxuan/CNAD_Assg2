@@ -6,6 +6,8 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { connectDB } = require('./config/db');
 const authRoutes = require('./routes/auth.routes');
 const unitRoutes = require('./routes/unit.routes');
+const userRoutes = require('./routes/user.routes');
+const tabletRoutes = require('./routes/tablet.routes');
 
 const app = express();
 const PORT = process.env.ACCOUNT_SERVICE_PORT || 3001;
@@ -19,6 +21,8 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/units', unitRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/tablets', tabletRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

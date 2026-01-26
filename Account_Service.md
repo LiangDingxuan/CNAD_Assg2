@@ -448,3 +448,8 @@ Account_service/
 - Remove `redis` from `package.json`
 - Remove demo `/api/auth/register` route
 - Add error response helper utility
+
+### Phase 9 - Delete functions and Integration
+- Full integration into Frontend and other services.
+- Since other services are complete, prepare code for implementation
+- Integrate delete endpoints across all endpoints possible
