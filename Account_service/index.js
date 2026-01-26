@@ -5,6 +5,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const { connectDB } = require('./config/db');
 const authRoutes = require('./routes/auth.routes');
+const unitRoutes = require('./routes/unit.routes');
 
 const app = express();
 const PORT = process.env.ACCOUNT_SERVICE_PORT || 3001;
@@ -17,6 +18,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/units', unitRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
