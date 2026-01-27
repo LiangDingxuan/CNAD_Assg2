@@ -1,18 +1,18 @@
-import { Link, useLocation } from 'react-router-dom'
-import { LayoutGrid, Bell, Ticket, BarChart3 } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutGrid, Users, Building2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
 
 interface NavTabProps {
   label: string
   to: string
   icon: React.ReactNode
-  badge?: number
 }
 
-function NavTab({ label, to, icon, badge }: NavTabProps) {
+function NavTab({ label, to, icon }: NavTabProps) {
   const location = useLocation()
-  const isActive = location.pathname === to
+  const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
 
   return (
     <Link
@@ -24,25 +24,33 @@ function NavTab({ label, to, icon, badge }: NavTabProps) {
     >
       {icon}
       {label}
-      {badge !== undefined && badge > 0 && (
-        <Badge variant="destructive" className="ml-1 size-5 p-0 flex items-center justify-center text-xs">
-          {badge}
-        </Badge>
-      )}
     </Link>
   )
 }
 
 export function StaffHeader() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   return (
     <header className="border-b border-border bg-background">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Care Facility Dashboard</h1>
         <nav className="flex items-center gap-2">
           <NavTab label="Overview" to="/staff" icon={<LayoutGrid className="size-4" />} />
-          <NavTab label="Alerts" to="/staff/alerts" icon={<Bell className="size-4" />} badge={4} />
-          <NavTab label="Vouchers" to="/staff/vouchers" icon={<Ticket className="size-4" />} />
-          <NavTab label="Analytics" to="/staff/analytics" icon={<BarChart3 className="size-4" />} />
+          <NavTab label="Users" to="/staff/users" icon={<Users className="size-4" />} />
+          <NavTab label="Units" to="/staff/units" icon={<Building2 className="size-4" />} />
+          <div className="ml-4 flex items-center gap-2 border-l pl-4">
+            <span className="text-sm text-muted-foreground">{user?.username}</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="size-4" />
+            </Button>
+          </div>
         </nav>
       </div>
     </header>

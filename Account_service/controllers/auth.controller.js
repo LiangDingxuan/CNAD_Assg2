@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const RefreshToken = require('../models/refreshToken.model');
 const TabletSession = require('../models/tabletSession.model');
-const { verifyPassword, makeSalt, hashPassword } = require('../utils/password.utils');
+const { verifyPassword, hashPassword, makeSalt } = require('../utils/password.utils');
 
 async function login(req, res, next) {
   try {
@@ -38,42 +38,6 @@ async function login(req, res, next) {
       user: { id: String(user._id), username: user.username, role: user.role, unitId: user.unitId || null }
     });
   } catch (err) {
-    next(err);
-  }
-}
-
-async function register(req, res, next) {
-  try {
-    const { username, email, password, role, unitId } = req.body || {};
-
-    if (!username || !password || !role) {
-      return res.status(400).json({ error: { code: 'MISSING_FIELDS', message: 'Username, password, and role are required.' } });
-    }
-
-    const existing = await User.findOne({ username }).lean();
-    if (existing) {
-      return res.status(409).json({ error: { code: 'USERNAME_EXISTS', message: 'A user with this username already exists.' } });
-    }
-
-    const salt = makeSalt();
-    const passwordHash = hashPassword(password, salt);
-
-    const user = await User.create({
-      username,
-      email: email || null,
-      role,
-      unitId: unitId || null,
-      passwordSalt: salt,
-      passwordHash
-    });
-
-    return res.status(201).json({
-      id: String(user._id), username: user.username, role: user.role, unitId: user.unitId || null
-    });
-  } catch (err) {
-    if (err.code === 11000) {
-      return res.status(409).json({ error: { code: 'USERNAME_EXISTS', message: 'A user with this username already exists.' } });
-    }
     next(err);
   }
 }
@@ -133,4 +97,41 @@ async function refresh(req, res, next) {
   }
 }
 
-module.exports = { login, register, logout, refresh };
+// TEMPORARY: Register endpoint for initial admin creation
+async function register(req, res, next) {
+  try {
+    const { username, password, role = 'admin' } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ error: { code: 'MISSING_FIELDS', message: 'Username and password are required.' } });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(409).json({ error: { code: 'USER_EXISTS', message: 'Username already exists.' } });
+    }
+
+    // Hash password
+    const salt = makeSalt();
+    const hash = hashPassword(password, salt);
+
+    // Create admin user
+    const user = await User.create({
+      username,
+      passwordSalt: salt,
+      passwordHash: hash,
+      role,
+      isActive: true
+    });
+
+    return res.status(201).json({
+      message: 'Admin user created successfully',
+      user: { id: String(user._id), username: user.username, role: user.role }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, logout, refresh, register };

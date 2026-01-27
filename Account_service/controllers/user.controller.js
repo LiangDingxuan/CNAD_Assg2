@@ -225,4 +225,70 @@ async function updateUser(req, res, next) {
   }
 }
 
-module.exports = { listUsers, getUser, createUser, updateUser };
+async function deleteUser(req, res, next) {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: { code: 'USER_NOT_FOUND', message: 'User not found.' } });
+    }
+
+    // Block if user is logged into any tablet
+    const session = await TabletSession.findOne({ loggedInUsers: user._id });
+    if (session) {
+      return res.status(409).json({ error: { code: 'CANNOT_DELETE', message: 'User is currently logged into a tablet. Log them out first.' } });
+    }
+
+    // Clean up orphaned refresh tokens
+    await RefreshToken.deleteMany({ userId: user._id });
+
+    await User.deleteOne({ _id: user._id });
+    return res.status(204).send();
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ error: { code: 'INVALID_ID', message: 'Invalid user ID format.' } });
+    }
+    next(err);
+  }
+}
+
+async function createStaffOrAdmin(req, res, next) {
+  try {
+    const { username, email, password, role } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ error: { code: 'MISSING_FIELDS', message: 'Username and password are required.' } });
+    }
+
+    if (role !== 'admin') {
+      return res.status(400).json({ error: { code: 'INVALID_ROLE', message: 'Role must be admin.' } });
+    }
+
+    const existing = await User.findOne({ username }).lean();
+    if (existing) {
+      return res.status(409).json({ error: { code: 'USERNAME_EXISTS', message: 'A user with this username already exists.' } });
+    }
+
+    const salt = makePasswordSalt();
+    const userData = {
+      username,
+      email: email || null,
+      role,
+      unitId: null,
+      passwordSalt: salt,
+      passwordHash: hashPassword(password, salt),
+      isActive: true
+    };
+
+    const user = await User.create(userData);
+    return res.status(201).json(sanitizeUser(user));
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: { code: 'USERNAME_EXISTS', message: 'A user with this username already exists.' } });
+    }
+    next(err);
+  }
+}
+
+module.exports = { listUsers, getUser, createUser, updateUser, deleteUser, createStaffOrAdmin };

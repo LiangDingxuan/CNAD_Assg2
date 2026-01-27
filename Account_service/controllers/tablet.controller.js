@@ -242,4 +242,50 @@ async function getSessions(req, res, next) {
   }
 }
 
-module.exports = { registerTablet, loginResident, verifyPinEndpoint, logoutResident, getSessions };
+async function listTablets(req, res, next) {
+  try {
+    const tablets = await TabletSession.find()
+      .populate('unitId', 'unitNumber')
+      .populate('loggedInUsers', 'username')
+      .sort({ tabletId: 1 })
+      .lean();
+
+    return res.json(tablets.map(t => ({
+      tabletId: t.tabletId,
+      unitId: t.unitId ? String(t.unitId._id) : null,
+      unitNumber: t.unitId?.unitNumber || null,
+      loggedInUsers: t.loggedInUsers.map(u => ({
+        id: String(u._id),
+        username: u.username,
+      })),
+    })));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteTablet(req, res, next) {
+  try {
+    const { tabletId } = req.params;
+
+    const session = await TabletSession.findOne({ tabletId });
+    if (!session) {
+      return res.status(404).json({ error: { code: 'TABLET_NOT_FOUND', message: 'Tablet not registered.' } });
+    }
+
+    // Block if tablet has logged-in users
+    if (session.loggedInUsers.length > 0) {
+      return res.status(409).json({ error: { code: 'CANNOT_DELETE', message: 'Tablet has logged-in users. Log them out first.' } });
+    }
+
+    // Clean up refresh tokens for this tablet
+    await RefreshToken.deleteMany({ tabletId });
+
+    await TabletSession.deleteOne({ _id: session._id });
+    return res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { registerTablet, loginResident, verifyPinEndpoint, logoutResident, getSessions, listTablets, deleteTablet };

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import axios from 'axios'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useAuth } from '@/hooks/useAuth'
 
 function useQuery() {
   const { search } = useLocation()
@@ -11,41 +13,39 @@ function useQuery() {
 
 export function LoginPage() {
   const query = useQuery()
-  const role = query.get('role') || 'staff' // staff | resident
+  const role = query.get('role') || 'staff'
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const accountApi = import.meta.env.VITE_ACCOUNT_API || 'http://localhost:3001'
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const res = await axios.post(`${accountApi}/api/auth/login`, { username, password })
-      const { token, user } = res.data
+      const response = await login(username, password)
 
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_user', JSON.stringify(user))
-
-      // simple role gate (frontend-only; backend can enforce later)
-      if (role === 'staff' && (user.role === 'staff' || user.role === 'admin')) {
+      if (role === 'staff' && (response?.role === 'staff' || response?.role === 'admin')) {
         navigate('/staff')
         return
       }
-      if (role === 'resident' && (user.role === 'resident' || user.role === 'user')) {
+      if (role === 'resident' && response?.role === 'resident') {
         navigate('/resident')
         return
       }
 
-      // wrong role
-      setError(`Logged in as ${user.role}, but this is the ${role} interface.`)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Login failed')
+      // Fallback: staff/admin go to staff, resident goes to resident
+      if (response?.role === 'staff' || response?.role === 'admin') {
+        navigate('/staff')
+      } else {
+        navigate('/resident')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -56,27 +56,24 @@ export function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{role === 'staff' ? 'Staff Login' : 'Resident Login'}</CardTitle>
-          <CardDescription>
-            Demo users (seeded): admin / staff1 / user1 / user2, password: password123
-          </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <label className="text-sm text-foreground">Username</label>
-              <input
-                className="w-full border border-border bg-background rounded-md px-3 py-2"
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g., staff1"
+                placeholder="e.g., admin"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm text-foreground">Password</label>
-              <input
-                className="w-full border border-border bg-background rounded-md px-3 py-2"
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -84,10 +81,10 @@ export function LoginPage() {
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button className="w-full" disabled={loading}>
-              {loading ? 'Logging in…' : 'Login'}
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
 
             <Button
