@@ -3,12 +3,16 @@ import { StaffHeader } from '@/components/staff/StaffHeader'
 import { ResidentCard } from '@/components/staff/ResidentCard'
 import { mockResidents } from '@/data/mockResidents'
 import type { Resident } from '@/types/staff'
+import { createTask } from '@/services/taskService'
 
 export function DashboardPage() {
   const [residents, setResidents] = useState<Resident[]>(mockResidents)
 
-  function handleCreateTask(residentId: string, payload: { name: string; scheduledTime: string }) {
-    void payload
+  async function handleCreateTask(
+    residentId: string,
+    payload: { name: string; scheduledTime: string }
+  ) {
+    await createTask({ userId: residentId, ...payload })
     setResidents((prev) =>
       prev.map((resident) =>
         resident.id === residentId

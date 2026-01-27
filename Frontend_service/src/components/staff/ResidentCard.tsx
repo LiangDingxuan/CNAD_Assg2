@@ -60,14 +60,24 @@ export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [taskName, setTaskName] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!taskName.trim() || !scheduledTime) return
-    onCreateTask?.(resident.id, { name: taskName.trim(), scheduledTime })
-    setTaskName('')
-    setScheduledTime('')
-    setIsDialogOpen(false)
+    setSubmitError(null)
+    setIsSubmitting(true)
+    try {
+      await onCreateTask?.(resident.id, { name: taskName.trim(), scheduledTime })
+      setTaskName('')
+      setScheduledTime('')
+      setIsDialogOpen(false)
+    } catch (error: any) {
+      setSubmitError(error?.message || 'Failed to create task')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -122,7 +132,13 @@ export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
             </div>
           </Link>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open)
+              if (open) setSubmitError(null)
+            }}
+          >
             <Button
               variant="secondary"
               size="sm"
@@ -161,9 +177,13 @@ export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
                     onChange={(event) => setScheduledTime(event.target.value)}
                   />
                 </div>
+                {submitError && <p className="text-sm text-destructive">{submitError}</p>}
                 <DialogFooter>
-                  <Button type="submit" disabled={!taskName.trim() || !scheduledTime}>
-                    Create Task
+                  <Button
+                    type="submit"
+                    disabled={!taskName.trim() || !scheduledTime || isSubmitting}
+                  >
+                    {isSubmitting ? 'Creating…' : 'Create Task'}
                   </Button>
                 </DialogFooter>
               </form>
