@@ -1,9 +1,20 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { Flame, Sparkles, Sunrise, Users, Star, Target, Footprints } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Resident, ResidentStatus, Badge as BadgeType } from '@/types/staff'
 
@@ -40,16 +51,43 @@ function AchievementBadge({ badge }: { badge: BadgeType }) {
 
 interface ResidentCardProps {
   resident: Resident
+  onCreateTask?: (residentId: string, payload: { name: string; scheduledTime: string }) => void
 }
 
-export function ResidentCard({ resident }: ResidentCardProps) {
-  const progressPercent = (resident.tasksCompleted / resident.tasksTotal) * 100
+export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
+  const progressPercent =
+    resident.tasksTotal === 0 ? 0 : (resident.tasksCompleted / resident.tasksTotal) * 100
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [taskName, setTaskName] = useState('')
+  const [scheduledTime, setScheduledTime] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!taskName.trim() || !scheduledTime) return
+    setSubmitError(null)
+    setIsSubmitting(true)
+    try {
+      await onCreateTask?.(resident.id, { name: taskName.trim(), scheduledTime })
+      setTaskName('')
+      setScheduledTime('')
+      setIsDialogOpen(false)
+    } catch (error: any) {
+      setSubmitError(error?.message || 'Failed to create task')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <Link to={`/staff/resident/${resident.id}`}>
-      <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
+    <Card className="hover:bg-accent/50 transition-colors">
+      <CardContent className="pt-6">
+        <div className="flex items-start gap-4">
+          <Link
+            to={`/staff/resident/${resident.id}`}
+            className="flex items-start gap-4 flex-1 min-w-0"
+          >
             <div className="relative">
               <Avatar className="size-12">
                 <AvatarImage src={resident.avatarUrl} alt={resident.name} />
@@ -92,9 +130,67 @@ export function ResidentCard({ resident }: ResidentCardProps) {
                 </div>
               )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+          </Link>
+
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open)
+              if (open) setSubmitError(null)
+            }}
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              Create Task
+            </Button>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Task</DialogTitle>
+                <DialogDescription>
+                  Assign a new task to {resident.name}.
+                </DialogDescription>
+              </DialogHeader>
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-2">
+                  <label htmlFor={`task-name-${resident.id}`} className="text-sm font-medium">
+                    Task name
+                  </label>
+                  <Input
+                    id={`task-name-${resident.id}`}
+                    placeholder="e.g., Take Medication"
+                    value={taskName}
+                    onChange={(event) => setTaskName(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor={`task-time-${resident.id}`} className="text-sm font-medium">
+                    Scheduled time
+                  </label>
+                  <Input
+                    id={`task-time-${resident.id}`}
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(event) => setScheduledTime(event.target.value)}
+                  />
+                </div>
+                {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    disabled={!taskName.trim() || !scheduledTime || isSubmitting}
+                  >
+                    {isSubmitting ? 'Creating…' : 'Create Task'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
