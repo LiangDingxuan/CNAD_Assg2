@@ -4,7 +4,7 @@ const UserSchema = new mongoose.Schema(
   {
     username:     { type: String, required: true, unique: true, trim: true },
     email:        { type: String, trim: true, default: null },
-    role:         { type: String, enum: ['admin', 'staff', 'resident'], required: true },
+    role:         { type: String, enum: ['admin', 'resident'], required: true },
     unitId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Unit', default: null },
     passwordHash: { type: String, default: null },
     passwordSalt: { type: String, default: null },

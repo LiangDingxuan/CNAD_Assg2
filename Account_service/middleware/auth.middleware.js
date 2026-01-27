@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const TabletSession = require('../models/tabletSession.model');
 
 function requireAuth(req, res, next) {
   try {
@@ -27,4 +29,32 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+async function requireDeviceSecret(req, res, next) {
+  try {
+    const { tabletId } = req.params;
+    const deviceSecret = req.headers['x-device-secret'];
+
+    if (!deviceSecret) {
+      return res.status(401).json({ error: { code: 'INVALID_DEVICE_SECRET', message: 'Missing device secret header.' } });
+    }
+
+    const session = await TabletSession.findOne({ tabletId });
+    if (!session) {
+      return res.status(404).json({ error: { code: 'TABLET_NOT_FOUND', message: 'Tablet not registered.' } });
+    }
+
+    const expected = Buffer.from(session.deviceSecret, 'utf8');
+    const provided = Buffer.from(deviceSecret, 'utf8');
+
+    if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+      return res.status(401).json({ error: { code: 'INVALID_DEVICE_SECRET', message: 'Invalid device secret.' } });
+    }
+
+    req.tabletSession = session;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { requireAuth, requireRole, requireDeviceSecret };

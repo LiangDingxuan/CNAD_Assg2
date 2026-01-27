@@ -1,4 +1,5 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 export function RequireAuth({
   children,
@@ -7,16 +8,23 @@ export function RequireAuth({
   children: React.ReactNode
   allowedRoles: string[]
 }) {
-  const token = localStorage.getItem('auth_token')
-  const userRaw = localStorage.getItem('auth_user')
+  const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (!token || !userRaw) return <Navigate to="/" replace />
-
-  try {
-    const user = JSON.parse(userRaw)
-    if (!allowedRoles.includes(user.role)) return <Navigate to="/" replace />
-    return <>{children}</>
-  } catch {
-    return <Navigate to="/" replace />
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
   }
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 }

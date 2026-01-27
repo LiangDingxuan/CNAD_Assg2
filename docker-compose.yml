@@ -7,13 +7,11 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_URI=${MONGODB_URI}
       - ACCOUNT_DB_NAME=${ACCOUNT_DB_NAME:-account}
       - ACCOUNT_SERVICE_PORT=3001
       - JWT_SECRET=${JWT_SECRET:-dev_only_change_me}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
-    depends_on:
-      - mongo
     networks:
       - app-network
 
@@ -23,8 +21,8 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - MONGODB_URI=mongodb+srv://liangdingxuan_db_user:8TTH27WozKMVs9s7@cluster0.dendyxq.mongodb.net/Task?retryWrites=true&w=majority
-      - TASK_DB_NAME=Task
+      - MONGODB_URI=${MONGODB_URI}
+      - TASK_DB_NAME=${TASK_DB_NAME:-Task}
       - TASK_SERVICE_PORT=3002
     networks:
       - app-network
@@ -52,21 +50,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3003
-      - MONGODB_URI=mongodb+srv://liangdingxuan_db_user:8TTH27WozKMVs9s7@cluster0.dendyxq.mongodb.net/Task?retryWrites=true&w=majority
+      - MONGODB_URI=${MONGODB_URI}
     depends_on:
       - task-service
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  # MongoDB
-  mongo:
-    image: mongo:6.0
-    container_name: mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
     networks:
       - app-network
     restart: unless-stopped
@@ -74,6 +60,3 @@ services:
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  mongodb_data:
