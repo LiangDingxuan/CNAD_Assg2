@@ -1,25 +1,86 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Flame, Star, CheckCircle2, Calendar } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { ResidentHeader } from '@/components/resident/ResidentHeader'
-import { MetricCard } from '@/components/resident/MetricCard'
-import { TaskCard } from '@/components/resident/TaskCard'
-import { AlarmModal } from '@/components/resident/AlarmModal'
-import { getUserById, getTasksForUser } from '@/data/mockHousehold'
-import type { AlarmData } from '@/types/alert'
-import type { TabletTask } from '@/types/resident'
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, CheckCircle2, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ResidentHeader } from '@/components/resident/ResidentHeader';
+import { TaskCard } from '@/components/resident/TaskCard';
+import { AlarmModal } from '@/components/resident/AlarmModal';
+import { useTabletAuth } from '@/context/TabletAuthContext';
+import type { AlarmData } from '@/types/alert';
+import type { TabletTask } from '@/types/resident';
+
+// TODO: Replace with real task service API call
+const mockTasks: TabletTask[] = [
+  {
+    id: 't1',
+    name: 'Morning Medication',
+    icon: '💊',
+    scheduledTime: '08:00',
+    completedTime: '08:05',
+    status: 'completed',
+  },
+  {
+    id: 't2',
+    name: 'Breakfast',
+    icon: '🍽️',
+    scheduledTime: '09:00',
+    completedTime: '09:10',
+    status: 'completed',
+  },
+  {
+    id: 't3',
+    name: 'Hygiene Routine',
+    icon: '🪥',
+    scheduledTime: '10:00',
+    completedTime: '10:15',
+    status: 'completed',
+  },
+  {
+    id: 't4',
+    name: 'Lunch',
+    icon: '🍽️',
+    scheduledTime: '12:00',
+    status: 'upcoming',
+  },
+  {
+    id: 't5',
+    name: 'Afternoon Activity',
+    icon: '⏰',
+    scheduledTime: '15:00',
+    status: 'upcoming',
+  },
+  {
+    id: 't6',
+    name: 'Evening Medication',
+    icon: '💊',
+    scheduledTime: '18:00',
+    status: 'upcoming',
+  },
+];
 
 export function ResidentDashboardPage() {
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [alarmOpen, setAlarmOpen] = useState(false)
-  const [alarmData, setAlarmData] = useState<AlarmData | null>(null)
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const userId = searchParams.get('user') || ''
-  const user = getUserById(userId)
-  const tasks = getTasksForUser(userId)
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [alarmOpen, setAlarmOpen] = useState(false);
+  const [alarmData, setAlarmData] = useState<AlarmData | null>(null);
+  const [tasks] = useState<TabletTask[]>(mockTasks);
+  const navigate = useNavigate();
+
+  const { currentUser, isAuthenticated, isLoading, tabletConfig } = useTabletAuth();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/resident');
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Redirect if tablet not configured
+  useEffect(() => {
+    if (!isLoading && !tabletConfig) {
+      navigate('/resident');
+    }
+  }, [tabletConfig, isLoading, navigate]);
 
   // Simulates a cron-triggered alarm by clicking a task card.
   // TODO: Replace with alert service polling/WebSocket when ready.
@@ -28,61 +89,47 @@ export function ResidentDashboardPage() {
       taskName: task.name,
       taskIcon: task.icon,
       scheduledTime: task.scheduledTime,
-    })
-    setAlarmOpen(true)
-  }, [])
+    });
+    setAlarmOpen(true);
+  }, []);
 
   const handleSnooze = useCallback(() => {
     // TODO: Call snoozeAlert(scheduleId) when alert service is ready
-    setAlarmOpen(false)
-  }, [])
+    setAlarmOpen(false);
+  }, []);
 
   const handleComplete = useCallback(() => {
     // TODO: Call completeAlert(scheduleId) when alert service is ready
-    setAlarmOpen(false)
-  }, [])
+    setAlarmOpen(false);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [])
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
-  if (!user) {
-    navigate('/resident')
-    return null
+  if (isLoading) {
+    return (
+      <div className="h-screen overflow-hidden bg-background flex items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
-  const completedTasks = tasks.filter((t) => t.status === 'completed')
-  const upcomingTasks = tasks.filter((t) => t.status !== 'completed')
+  if (!currentUser) {
+    return null;
+  }
+
+  const completedTasks = tasks.filter((t) => t.status === 'completed');
+  const upcomingTasks = tasks.filter((t) => t.status !== 'completed');
 
   return (
     <div className="h-screen overflow-hidden bg-background flex flex-col">
-      <ResidentHeader currentUser={user} currentTime={currentTime} />
+      <ResidentHeader currentTime={currentTime} />
 
       <main className="flex-1 flex flex-col overflow-hidden px-6 pb-4">
-        <div className="flex gap-4 mb-3">
-          <MetricCard
-            icon={<Flame className="size-6 text-orange-500" />}
-            label="Streak"
-            value={`${user.streak} days`}
-            variant="streak"
-          />
-          <MetricCard
-            icon={<Star className="size-6 text-yellow-500" />}
-            label="Total Points"
-            value={user.points}
-            variant="points"
-          />
-          <MetricCard
-            icon={<CheckCircle2 className="size-6 text-green-500" />}
-            label="Completed"
-            value={`${completedTasks.length}/${tasks.length}`}
-            variant="completed"
-          />
-        </div>
-
         <Separator className="mb-3" />
 
         <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 overflow-hidden">
@@ -115,5 +162,5 @@ export function ResidentDashboardPage() {
         onComplete={handleComplete}
       />
     </div>
-  )
+  );
 }

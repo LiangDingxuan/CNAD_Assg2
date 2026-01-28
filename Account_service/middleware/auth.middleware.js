@@ -57,4 +57,39 @@ async function requireDeviceSecret(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, requireRole, requireDeviceSecret };
+// Middleware that accepts EITHER admin JWT for tablet access (no device secret needed)
+async function requireTabletAccess(req, res, next) {
+  try {
+    const { tabletId } = req.params;
+
+    // Try JWT auth (admin access)
+    const header = req.headers.authorization || '';
+    const [type, token] = header.split(' ');
+
+    if (type === 'Bearer' && token) {
+      try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        // Only admin can access tablet endpoints via JWT
+        if (payload.role === 'admin') {
+          req.user = payload;
+          // Load tablet session for the controller
+          const session = await TabletSession.findOne({ tabletId });
+          if (!session) {
+            return res.status(404).json({ error: { code: 'TABLET_NOT_FOUND', message: 'Tablet not registered.' } });
+          }
+          req.tabletSession = session;
+          return next();
+        }
+      } catch {
+        // JWT invalid
+      }
+    }
+
+    // No valid admin auth
+    return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Admin JWT required.' } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { requireAuth, requireRole, requireDeviceSecret, requireTabletAccess };
