@@ -4,7 +4,11 @@ const Task = require('../models/task.model');
 // Get all tasks
 exports.getAllTasks = async (req, res) => {
   try {
-    const tasks = await Task.find().sort({ createdAt: -1 });
+    const filter = {};
+    if (req.query.userId) {
+      filter.userId = req.query.userId;
+    }
+    const tasks = await Task.find(filter).sort({ createdAt: -1 });
     res.status(200).json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
