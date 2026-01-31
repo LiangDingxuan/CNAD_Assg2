@@ -121,23 +121,67 @@ const VideoStreamer: React.FC = () => {
   // Start video streaming
   const startStreaming = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'environment'
+      // Try different camera configurations
+      const constraints = [
+        {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'environment'
+          },
+          audio: false
         },
-        audio: false
-      });
+        {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        },
+        {
+          video: true,
+          audio: false
+        }
+      ];
+
+      let stream = null;
+      let lastError = null;
+
+      // Try each constraint configuration
+      for (const constraint of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          break; // Success, exit the loop
+        } catch (err) {
+          lastError = err;
+          console.log('Failed with constraints:', constraint, err);
+          continue; // Try next configuration
+        }
+      }
+
+      if (!stream) {
+        throw lastError || new Error('No camera stream could be obtained');
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsStreaming(true);
+        setError(null);
+        
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded, dimensions:', 
+            videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+          videoRef.current?.play().catch(err => {
+            console.error('Error playing video:', err);
+            setError('Failed to start video playback');
+          });
+        };
       }
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setError('Failed to access camera. Please ensure camera permissions are granted.');
+      setError(`Camera access failed: ${err instanceof Error ? err.message : 'Unknown error'}. Please check camera permissions.`);
     }
   };
 
@@ -369,6 +413,19 @@ const VideoStreamer: React.FC = () => {
               muted
               className="w-full rounded-lg bg-black"
               style={{ maxHeight: '480px' }}
+              onError={(e) => {
+                console.error('Video error:', e);
+                setError('Video playback error occurred');
+              }}
+              onCanPlay={() => {
+                console.log('Video can play');
+              }}
+              onStalled={() => {
+                console.log('Video stalled');
+              }}
+              onSuspend={() => {
+                console.log('Video suspended');
+              }}
             />
             <canvas
               ref={canvasRef}
@@ -377,6 +434,14 @@ const VideoStreamer: React.FC = () => {
             {isPaused && (
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
                 <div className="text-white text-lg font-semibold">Paused</div>
+              </div>
+            )}
+            {!isStreaming && (
+              <div className="absolute inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center rounded-lg">
+                <div className="text-white text-center">
+                  <CameraOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Camera not started</p>
+                </div>
               </div>
             )}
           </div>
