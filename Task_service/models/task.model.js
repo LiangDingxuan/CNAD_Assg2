@@ -7,7 +7,16 @@ const taskSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  userId: {
+    type: String,
+    required: true,
+    index: true
+  },
   description: {
+    type: String,
+    required: true
+  },
+  scheduledTime: {
     type: String,
     required: true
   },

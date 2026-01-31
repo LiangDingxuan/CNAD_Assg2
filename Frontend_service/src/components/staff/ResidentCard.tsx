@@ -51,7 +51,10 @@ function AchievementBadge({ badge }: { badge: BadgeType }) {
 
 interface ResidentCardProps {
   resident: Resident
-  onCreateTask?: (residentId: string, payload: { name: string; scheduledTime: string }) => void
+  onCreateTask?: (
+    residentId: string,
+    payload: { name: string; description: string; scheduledTime: string }
+  ) => void
 }
 
 export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
@@ -59,18 +62,24 @@ export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
     resident.tasksTotal === 0 ? 0 : (resident.tasksCompleted / resident.tasksTotal) * 100
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [taskName, setTaskName] = useState('')
+  const [description, setDescription] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (!taskName.trim() || !scheduledTime) return
+    if (!taskName.trim() || !description.trim() || !scheduledTime) return
     setSubmitError(null)
     setIsSubmitting(true)
     try {
-      await onCreateTask?.(resident.id, { name: taskName.trim(), scheduledTime })
+      await onCreateTask?.(resident.id, {
+        name: taskName.trim(),
+        description: description.trim(),
+        scheduledTime
+      })
       setTaskName('')
+      setDescription('')
       setScheduledTime('')
       setIsDialogOpen(false)
     } catch (error: any) {
@@ -177,11 +186,24 @@ export function ResidentCard({ resident, onCreateTask }: ResidentCardProps) {
                     onChange={(event) => setScheduledTime(event.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <label htmlFor={`task-desc-${resident.id}`} className="text-sm font-medium">
+                    Description
+                  </label>
+                  <Input
+                    id={`task-desc-${resident.id}`}
+                    placeholder="Short instructions for the resident"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </div>
                 {submitError && <p className="text-sm text-destructive">{submitError}</p>}
                 <DialogFooter>
                   <Button
                     type="submit"
-                    disabled={!taskName.trim() || !scheduledTime || isSubmitting}
+                    disabled={
+                      !taskName.trim() || !description.trim() || !scheduledTime || isSubmitting
+                    }
                   >
                     {isSubmitting ? 'Creating…' : 'Create Task'}
                   </Button>
