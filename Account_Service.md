@@ -1,4 +1,4 @@
-# Account Service — Implementation Design (Final)
+# Account Service — Implementation Design (Final) ✅ COMPLETE
 
 ## Core Architecture
 
@@ -18,7 +18,7 @@
 {
   username:     { type: String, required: true, unique: true, trim: true },
   email:        { type: String, unique: true, sparse: true, trim: true }, // nullable for residents
-  role:         { type: String, enum: ['admin', 'staff', 'resident'], required: true },
+  role:         { type: String, enum: ['admin', 'resident'], required: true }, // 'staff' removed in implementation
   unitId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Unit', default: null }, // null for admins (cross-unit access)
   passwordHash: { type: String, default: null }, // null for residents
   passwordSalt: { type: String, default: null }, // null for residents
@@ -109,8 +109,18 @@ All error responses follow this shape:
 |------|------|---------|
 | `MISSING_FIELDS` | 400 | Required fields not provided |
 | `INVALID_PIN_FORMAT` | 400 | PIN is not exactly 4 digits |
+| `INVALID_ID` | 400 | Malformed MongoDB ObjectId |
+| `INVALID_ROLE` | 400 | Role not in allowed values |
+| `INVALID_OPERATION` | 400 | Wrong auth type for role (e.g., password for resident) |
+| `UNIT_INACTIVE` | 400 | Cannot assign user to inactive unit |
 | `INVALID_CREDENTIALS` | 401 | Username/password mismatch |
 | `INVALID_PIN` | 401 | PIN verification failed |
+| `INVALID_TOKEN` | 401 | Missing/malformed/expired JWT |
+| `INVALID_DEVICE_SECRET` | 401 | Tablet device secret mismatch |
+| `MISSING_REFRESH_TOKEN` | 401 | No refresh cookie provided |
+| `INVALID_REFRESH_TOKEN` | 401 | Refresh token not found in DB |
+| `EXPIRED_REFRESH_TOKEN` | 401 | Refresh token past expiresAt |
+| `USER_INVALID` | 401 | User deactivated during active session |
 | `ACCOUNT_DEACTIVATED` | 403 | Account isActive === false |
 | `INSUFFICIENT_ROLE` | 403 | Role not authorized for action |
 | `UNIT_MISMATCH` | 403 | Resident's unit doesn't match tablet's unit |
@@ -118,8 +128,14 @@ All error responses follow this shape:
 | `USER_NOT_FOUND` | 404 | User does not exist |
 | `NOT_LOGGED_IN` | 404 | User not in tablet's loggedInUsers |
 | `UNIT_NOT_FOUND` | 404 | Unit does not exist |
+| `TABLET_NOT_FOUND` | 404 | Tablet not registered |
+| `USER_EXISTS` | 409 | Username already taken |
 | `USERNAME_EXISTS` | 409 | Duplicate username |
-| `INVALID_DEVICE_SECRET` | 401 | Tablet device secret mismatch |
+| `UNIT_EXISTS` | 409 | Unit number already exists |
+| `TABLET_EXISTS` | 409 | Tablet ID already registered |
+| `ALREADY_LOGGED_IN` | 409 | User already in tablet session |
+| `CANNOT_DELETE` | 409 | Has dependencies (users/tablets/sessions) |
+| `RATE_LIMITED` | 429 | Too many attempts (5/15min) |
 
 ---
 
@@ -290,43 +306,50 @@ await RefreshToken.deleteMany({ userId, tabletId });
 
 ## API Endpoints
 
-### Authentication (4 endpoints)
+### Authentication (5 endpoints)
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/auth/login` | None | Admin/staff login, returns JWT |
-| GET | `/api/auth/me` | Bearer | Returns current user profile |
-| POST | `/api/auth/logout` | Bearer | Returns 204 No Content (client discards token) |
-| POST | `/api/auth/refresh` | Cookie | Refresh access token using refresh token |
+| Method | Path | Auth | Rate Limited | Description |
+|--------|------|------|--------------|-------------|
+| POST | `/api/auth/register` | None | No | **TEMP:** Create initial admin (remove in prod) |
+| POST | `/api/auth/login` | None | Yes (5/15min) | Admin login, returns JWT (8h expiry) |
+| GET | `/api/auth/me` | Bearer | No | Returns current user profile |
+| POST | `/api/auth/logout` | Bearer | No | Returns 204 No Content (stateless) |
+| POST | `/api/auth/refresh` | Cookie | No | Refresh access token using httpOnly cookie |
 
-**Note:** No public `/register` endpoint. All user creation goes through admin-only user management.
+**Note:** `/api/auth/register` is temporary for bootstrapping. Remove before production.
 
-### User Management (4 endpoints)
+### User Management (6 endpoints)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/users` | Admin | List users. Query: `?role=&unitId=&isActive=` |
 | GET | `/api/users/:userId` | Admin | Get single user |
-| POST | `/api/users` | Admin | Create user (staff with password, resident with PIN) |
-| PATCH | `/api/users/:userId` | Admin | Update user fields |
+| POST | `/api/users` | Admin | Create user (admin w/ password, resident w/ PIN) |
+| POST | `/api/users/staff` | Admin | Create staff/admin user |
+| PATCH | `/api/users/:userId` | Admin | Update user fields (handles unit/deactivation cleanup) |
+| DELETE | `/api/users/:userId` | Admin | Delete user (blocked if logged into tablet) |
 
-### Tablet Sessions (5 endpoints)
+### Tablet Sessions (7 endpoints)
+
+| Method | Path | Auth | Rate Limited | Description |
+|--------|------|------|--------------|-------------|
+| GET | `/api/tablets` | Admin | No | List all tablets with sessions |
+| POST | `/api/tablets/register` | Admin | No | Register tablet to unit, returns device secret |
+| POST | `/api/tablets/:tabletId/login` | Admin | No | Log resident into tablet (max 2) |
+| POST | `/api/tablets/:tabletId/logout` | Admin | No | Log resident out of tablet |
+| DELETE | `/api/tablets/:tabletId` | Admin | No | Delete tablet (blocked if has users) |
+| POST | `/api/tablets/:tabletId/verify-pin` | Device Secret | Yes (5/15min) | PIN auth → JWT (1h) + refresh cookie (7d) |
+| GET | `/api/tablets/:tabletId/sessions` | Device Secret | No | Get logged-in users for tablet UI |
+
+### Units (5 endpoints)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/tablets/register` | Admin | Register tablet, returns device secret |
-| POST | `/api/tablets/:tabletId/login` | Admin | Log resident into tablet |
-| POST | `/api/tablets/:tabletId/verify-pin` | Device Secret | Resident PIN verification, returns JWT + refresh token |
-| POST | `/api/tablets/:tabletId/logout` | Admin | Log resident out of tablet |
-| GET | `/api/tablets/:tabletId/sessions` | Device Secret | Get logged-in users for tablet UI (returns display names only) |
-
-### Units (3 endpoints)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/units` | Staff+ | List active units |
-| POST | `/api/units` | Admin | Create unit |
-| PATCH | `/api/units/:unitId` | Admin | Update unit (including deactivation via isActive: false) |
+| GET | `/api/units` | Admin/Staff | List units. Query: `?isActive=` |
+| GET | `/api/units/:unitId` | Admin/Staff | Get single unit |
+| POST | `/api/units` | Admin | Create unit + auto-register tablet |
+| PATCH | `/api/units/:unitId` | Admin | Update unit fields |
+| DELETE | `/api/units/:unitId` | Admin | Delete unit (blocked if has users/tablets) |
 
 ### Health
 
@@ -334,7 +357,7 @@ await RefreshToken.deleteMany({ userId, tabletId });
 |--------|------|------|-------------|
 | GET | `/health` | None | Readiness check |
 
-**Total: 17 endpoints (including health)**
+**Total: 24 endpoints (including health)**
 
 ---
 
@@ -363,88 +386,159 @@ await RefreshToken.deleteMany({ userId, tabletId });
 
 ---
 
-## What's Deferred
+## What's Deferred (Post-MVP)
 
 | Feature | Reason |
 |---------|--------|
 | Redis token blacklisting | Short-lived JWTs are sufficient. Add later if force-logout becomes a requirement. |
 | Event emissions | Services communicate via REST only. Gamification service will poll or be notified via REST when added. |
-| Password change/reset | Not critical for MVP. Admin can update credentials directly. |
+| Password change/reset | Not critical for MVP. Admin can update credentials directly via PATCH. |
 | Input sanitization library | Basic validation in controllers for now. Can add express-validator later. |
-| Frontend integration details | Frontend team handles auth flow with the JWT contract defined above. |
+| Remove temp register endpoint | `/api/auth/register` must be removed before production deployment. |
+| Staff role | Currently only `admin` and `resident` roles implemented. Staff role deferred. |
 
 ---
 
-## File Structure
+## File Structure ✅ IMPLEMENTED
 
 ```
 Account_service/
 ├── models/
-│   ├── user.model.js
-│   ├── unit.model.js
-│   ├── tabletSession.model.js
-│   └── refreshToken.model.js
+│   ├── user.model.js            ✅ User schema (admin/resident, scrypt hash fields)
+│   ├── unit.model.js            ✅ Unit schema (unitNumber, floor, block, isActive)
+│   ├── tabletSession.model.js   ✅ Tablet sessions (deviceSecret, max 2 loggedInUsers)
+│   └── refreshToken.model.js    ✅ Refresh tokens (userId, tabletId, token, expiresAt)
 ├── config/
-│   └── db.js
+│   └── db.js                    ✅ MongoDB connection
 ├── controllers/
-│   ├── auth.controller.js       (login, me, logout, refresh)
-│   ├── user.controller.js       (CRUD)
-│   ├── tablet.controller.js     (register, session management)
-│   └── unit.controller.js       (CRUD)
+│   ├── auth.controller.js       ✅ login, logout, refresh, register (temp)
+│   ├── user.controller.js       ✅ CRUD + cleanup on unit change/deactivation
+│   ├── tablet.controller.js     ✅ register, login/logout resident, verify PIN, sessions, list, delete
+│   └── unit.controller.js       ✅ CRUD + auto tablet creation on unit create
 ├── middleware/
-│   ├── auth.middleware.js       (requireAuth, requireRole, requireDeviceSecret)
-│   └── rateLimiter.js
+│   ├── auth.middleware.js       ✅ requireAuth (JWT), requireRole, requireDeviceSecret (timing-safe)
+│   └── rateLimiter.js           ✅ loginLimiter, pinLimiter (5 attempts/15min)
 ├── routes/
-│   ├── auth.routes.js
-│   ├── user.routes.js
-│   ├── tablet.routes.js
-│   └── unit.routes.js
+│   ├── auth.routes.js           ✅ Mounted at /api/auth
+│   ├── user.routes.js           ✅ Mounted at /api/users (admin only)
+│   ├── tablet.routes.js         ✅ Mounted at /api/tablets
+│   └── unit.routes.js           ✅ Mounted at /api/units
 ├── utils/
-│   ├── password.utils.js        (hash/verify passwords, async scrypt)
-│   └── pin.utils.js             (hash/verify PINs, async scrypt)
-├── index.js                     (mount all routes)
+│   ├── password.utils.js        ✅ Sync scrypt: hashPassword, verifyPassword, makeSalt
+│   └── pin.utils.js             ✅ Sync scrypt: hashPin, verifyPin, makeSalt
+├── index.js                     ✅ Entry point, CORS config, mounts all routes
+├── register-admin.js            ✅ CLI script for initial admin creation
 ├── Dockerfile
-├── package.json                 (remove redis, add express-rate-limit)
+├── package.json
 └── package-lock.json
 ```
 
 ---
 
-## Implementation Order
+## Implementation Status ✅ ALL PHASES COMPLETE
 
-### Phase 1 — Fix Bugs & Restructure
-- Fix file naming/path mismatches (controller import, model location)
-- Update `user.model.js` schema to match design (nullable fields, ObjectId unitId, PIN fields, isActive)
-- Update `auth.controller.js` to use standardized error format and reject resident login
-- Rename `utils/password.js` → `utils/password.utils.js`
+### Phase 1 — Fix Bugs & Restructure ✅
+- [x] Fixed file naming/path mismatches
+- [x] Updated `user.model.js` schema (nullable fields, ObjectId unitId, PIN fields, isActive)
+- [x] Updated `auth.controller.js` with standardized error format, reject resident login
+- [x] Renamed `utils/password.js` → `utils/password.utils.js`
 
-### Phase 2 — Models & Utils
-- Create `models/unit.model.js`
-- Create `models/tabletSession.model.js`
-- Create `models/refreshToken.model.js`
-- Create `utils/pin.utils.js`
+### Phase 2 — Models & Utils ✅
+- [x] Created `models/unit.model.js`
+- [x] Created `models/tabletSession.model.js`
+- [x] Created `models/refreshToken.model.js`
+- [x] Created `utils/pin.utils.js`
 
-### Phase 3 — Middleware
-- Add `requireDeviceSecret` to `middleware/auth.middleware.js`
-- Create `middleware/rateLimiter.js` (install `express-rate-limit`)
+### Phase 3 — Middleware ✅
+- [x] Added `requireDeviceSecret` to `middleware/auth.middleware.js` (timing-safe compare)
+- [x] Created `middleware/rateLimiter.js` (express-rate-limit)
 
-### Phase 4 — Units CRUD
-- Create `controllers/unit.controller.js` + `routes/unit.routes.js`
-- Mount in `index.js`
+### Phase 4 — Units CRUD ✅
+- [x] Created `controllers/unit.controller.js` + `routes/unit.routes.js`
+- [x] Mounted at `/api/units`
+- [x] Auto-creates tablet when unit is created
 
-### Phase 5 — User Management CRUD
-- Create `controllers/user.controller.js` + `routes/user.routes.js`
-- Mount in `index.js`
+### Phase 5 — User Management CRUD ✅
+- [x] Created `controllers/user.controller.js` + `routes/user.routes.js`
+- [x] Mounted at `/api/users`
+- [x] Cleanup logic: removes from tablet sessions + deletes refresh tokens on unit change/deactivation
 
-### Phase 6 — Auth Enhancements
-- Add `logout`, `refresh` to `auth.controller.js`
-- Update `auth.routes.js`
+### Phase 6 — Auth Enhancements ✅
+- [x] Added `logout`, `refresh` to `auth.controller.js`
+- [x] Updated `auth.routes.js`
+- [x] Refresh validates user still logged into tablet
 
-### Phase 7 — Tablet Session Management
-- Create `controllers/tablet.controller.js` + `routes/tablet.routes.js`
-- Mount in `index.js`
+### Phase 7 — Tablet Session Management ✅
+- [x] Created `controllers/tablet.controller.js` + `routes/tablet.routes.js`
+- [x] Mounted at `/api/tablets`
 
-### Phase 8 — Cleanup
-- Remove `redis` from `package.json`
-- Remove demo `/api/auth/register` route
-- Add error response helper utility
+### Phase 8 — Cleanup ✅
+- [x] Removed `redis` from `package.json`
+- [x] `/api/auth/register` kept temporarily for bootstrapping (remove before prod)
+
+### Phase 9 — Delete Functions & Integration ✅
+- [x] DELETE `/api/users/:userId` — blocked if user logged into tablet
+- [x] DELETE `/api/tablets/:tabletId` — blocked if has logged-in users
+- [x] DELETE `/api/units/:unitId` — blocked if has users or tablets
+
+---
+
+## Authentication Flow Diagrams
+
+### Admin/Staff Login Flow
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ 1. Admin enters username/password on Login page                  │
+│ 2. POST /api/auth/login → validates credentials via scrypt       │
+│ 3. Returns JWT (8h expiry) with { sub, username, role, unitId }  │
+│ 4. Frontend stores token in AuthContext                          │
+│ 5. All API calls include Authorization: Bearer <token>           │
+│ 6. Protected routes use requireAuth middleware to validate JWT   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Resident Tablet Flow (PIN-based)
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ SETUP (Admin performs once per unit)                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 1. Create Unit: POST /api/units                                         │
+│    → Auto-creates tablet with device secret (shown once)                │
+│ 2. Create Residents: POST /api/users (role=resident, unitId, PIN)       │
+│ 3. Login residents to tablet: POST /api/tablets/:tabletId/login         │
+│    → Max 2 residents per tablet                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ DAILY USE (Tablet performs)                                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 1. Tablet fetches logged-in profiles:                                   │
+│    GET /api/tablets/:tabletId/sessions                                  │
+│    Header: X-Device-Secret: <deviceSecret>                              │
+│                                                                         │
+│ 2. Resident selects profile, enters 4-digit PIN:                        │
+│    POST /api/tablets/:tabletId/verify-pin                               │
+│    Header: X-Device-Secret: <deviceSecret>                              │
+│    Body: { userId, pin }                                                │
+│    → Returns JWT (1h) + sets httpOnly refresh cookie (7 days)           │
+│                                                                         │
+│ 3. Tablet uses JWT for API calls (Task service, etc.)                   │
+│    Header: Authorization: Bearer <token>                                │
+│                                                                         │
+│ 4. When JWT expires, tablet silently refreshes:                         │
+│    POST /api/auth/refresh                                               │
+│    Cookie: refreshToken=<token>                                         │
+│    → Returns new JWT if: token valid + user active + still logged in    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Security Mechanisms
+| Mechanism | Implementation | Purpose |
+|-----------|----------------|---------|
+| Device Secret | 256-bit random hex | Authenticates tablet hardware |
+| PIN (4-digit) | scrypt-hashed | Simple resident auth |
+| Password | scrypt-hashed | Admin auth |
+| JWT Access Token | jsonwebtoken | Stateless API auth (1h resident, 8h admin) |
+| Refresh Token | Stored in DB, httpOnly cookie | Silent token refresh (7-day expiry) |
+| Rate Limiting | express-rate-limit | 5 attempts/15min for login & PIN |
+| Timing-safe compare | crypto.timingSafeEqual | Prevents timing attacks on device secret |
