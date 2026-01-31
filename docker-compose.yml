@@ -57,6 +57,19 @@ services:
       - app-network
     restart: unless-stopped
 
+  gamification-service:
+    build: ./Gamification_service
+    container_name: gamification-service
+    ports:
+      - "3004:3004"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - GAMIFICATION_DB_NAME=${GAMIFICATION_DB_NAME:-gamification}
+      - GAMIFICATION_SERVICE_PORT=3004
+    networks:
+      - app-network
+    restart: unless-stopped
+
 networks:
   app-network:
     driver: bridge
