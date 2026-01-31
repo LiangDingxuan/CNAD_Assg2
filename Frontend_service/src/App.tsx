@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/context/AuthContext'
+import { ResidentLayout } from '@/components/ResidentLayout'
 import { LandingPage } from '@/pages/LandingPage'
 import { DashboardPage } from '@/pages/staff/DashboardPage'
 import { ResidentDetailsPage } from '@/pages/staff/ResidentDetailsPage'
@@ -9,6 +10,7 @@ import { RequireAuth } from '@/components/RequireAuth'
 import { ProfileSelectPage } from '@/pages/resident/ProfileSelectPage'
 import { PinEntryPage } from '@/pages/resident/PinEntryPage'
 import { ResidentDashboardPage } from '@/pages/resident/DashboardPage'
+import { TabletSetupPage } from '@/pages/resident/TabletSetupPage'
 import UsersPage from '@/pages/staff/UsersPage'
 import UserFormPage from '@/pages/staff/UserFormPage'
 import UnitsPage from '@/pages/staff/UnitsPage'
@@ -100,10 +102,13 @@ function App() {
           }
         />
 
-        {/* Resident routes */}
-        <Route path="/resident" element={<ProfileSelectPage />} />
-        <Route path="/resident/pin" element={<PinEntryPage />} />
-        <Route path="/resident/dashboard" element={<ResidentDashboardPage />} />
+        {/* Resident routes - wrapped in TabletAuthProvider via ResidentLayout */}
+        <Route path="/resident" element={<ResidentLayout />}>
+          <Route index element={<ProfileSelectPage />} />
+          <Route path="pin" element={<PinEntryPage />} />
+          <Route path="dashboard" element={<ResidentDashboardPage />} />
+          <Route path="setup" element={<TabletSetupPage />} />
+        </Route>
       </Routes>
       <Toaster />
     </AuthProvider>
