@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const taskRoutes = require('./routes/task.routes');
 const { connectDB } = require('./config/db');
+const schedulerService = require('./services/scheduler.service');
 
 const app = express();
 const PORT = process.env.TASK_SERVICE_PORT || 3002;
@@ -33,5 +34,24 @@ app.get('/health', (req, res) => {
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Task Service running on port ${PORT}`);
+    
+    // Start the scheduler after a short delay to ensure DB is ready
+    setTimeout(() => {
+      schedulerService.start();
+      console.log('Task scheduler started');
+    }, 2000);
   });
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\nShutting down gracefully...');
+  schedulerService.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\nShutting down gracefully...');
+  schedulerService.stop();
+  process.exit(0);
 });

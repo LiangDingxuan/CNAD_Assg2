@@ -17,6 +17,7 @@ import UserFormPage from '@/pages/staff/UserFormPage'
 import UnitsPage from '@/pages/staff/UnitsPage'
 import UnitFormPage from '@/pages/staff/UnitFormPage'
 import UnitDetailPage from '@/pages/staff/UnitDetailPage'
+import TaskTestPage from '@/pages/TaskTestPage'
 
 function App() {
   return (
@@ -135,6 +136,9 @@ function App() {
           <Route path="dashboard" element={<ResidentDashboardPage />} />
           <Route path="setup" element={<TabletSetupPage />} />
         </Route>
+
+        {/* Task Management Test Route */}
+        <Route path="/task-test" element={<TaskTestPage />} />
       </Routes>
       <Toaster />
     </AuthProvider>

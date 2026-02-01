@@ -11,6 +11,11 @@ const taskSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  category: {
+    type: String,
+    enum: ['hygiene', 'medication', 'meals', 'chores', 'other'],
+    default: 'other'
+  },
   status: {
     type: String,
     enum: ['pending', 'in_progress', 'completed', 'snoozed', 'missed'],
@@ -19,6 +24,19 @@ const taskSchema = new mongoose.Schema({
   time_taken: {
     type: Number,
     default: 0
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   createdAt: {
     type: Date,

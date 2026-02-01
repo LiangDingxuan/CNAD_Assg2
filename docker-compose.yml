@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   account-service:
@@ -22,8 +22,10 @@ services:
       - "3002:3002"
     environment:
       - MONGODB_URI=${MONGODB_URI}
-      - TASK_DB_NAME=${TASK_DB_NAME:-Task}
+      - TASK_DB_NAME=${TASK_DB_NAME}
       - TASK_SERVICE_PORT=3002
+    depends_on:
+      - mongo
     networks:
       - app-network
 
@@ -93,3 +95,7 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local

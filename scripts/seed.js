@@ -49,46 +49,63 @@ const sampleUsers = [
 const { ObjectId } = require('mongodb');
 
 const sampleTasks = [
-  {
+  { 
     _id: new ObjectId(),
     name: 'Morning Medication',
     description: 'Take prescribed morning medication with water',
+    category: 'medication',
     status: 'completed',
-    time_taken: 5
+    time_taken: 5,
+    priority: 'high',
+    assignedTo: sampleUsers[0]._id,
+    createdBy: sampleUsers[1]._id
   },
-  {
+  { 
     _id: new ObjectId(),
     name: 'Breakfast',
     description: 'Prepare and eat breakfast',
+    category: 'meals',
     status: 'completed',
-    time_taken: 20
+    time_taken: 20,
+    priority: 'medium',
+    assignedTo: sampleUsers[0]._id,
+    createdBy: sampleUsers[1]._id
   },
-  {
+  { 
     _id: new ObjectId(),
     name: 'Brush Teeth',
     description: 'Brush teeth for 2 minutes',
+    category: 'hygiene',
     status: 'snoozed',
-    time_taken: 0
+    time_taken: 0,
+    priority: 'medium',
+    assignedTo: sampleUsers[0]._id,
+    createdBy: sampleUsers[1]._id
   },
-  {
+  { 
     _id: new ObjectId(),
     name: 'Lunch',
     description: 'Prepare and eat lunch',
+    category: 'meals',
     status: 'pending',
-    time_taken: 0
+    time_taken: 0,
+    priority: 'medium',
+    assignedTo: sampleUsers[0]._id,
+    createdBy: sampleUsers[1]._id
   },
-  {
+  { 
     _id: new ObjectId(),
     name: 'Evening Medication',
     description: 'Take prescribed evening medication with water',
+    category: 'medication',
     status: 'pending',
     time_taken: 0,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    priority: 'high',
+    assignedTo: sampleUsers[0]._id,
+    createdBy: sampleUsers[1]._id
   }
 ];
 
-// Sample schedule data
 const sampleSchedules = [
   {
     _id: new ObjectId(),
