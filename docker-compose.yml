@@ -91,6 +91,9 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+    environment:
+      - MONGO_LOG_LEVEL=error
+    command: mongod --quiet
 
 networks:
   app-network:

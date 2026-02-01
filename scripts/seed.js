@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const crypto = require('crypto');
 require('dotenv').config({ path: require('path').resolve(__dirname, './.env') });
 
@@ -22,9 +22,11 @@ function hashPassword(password, salt) {
 }
 
 // Demo passwords (for prototype only)
-function makeUser(username, email, role, unitId, plainPassword) {
+function makeUser(username, email, role, unitId, plainPassword, plainPin = '1234') {
   const salt = makeSalt();
   const passwordHash = hashPassword(plainPassword, salt);
+  const pinSalt = makeSalt();
+  const pinHash = hashPassword(plainPin, pinSalt);
   return {
     username,
     email,
@@ -32,21 +34,34 @@ function makeUser(username, email, role, unitId, plainPassword) {
     unitId: unitId || null,
     passwordSalt: salt,
     passwordHash,
+    pinSalt,
+    pinHash,
     createdAt: new Date(),
-    updatedAt: new Date()
+    updatedAt: new Date(),
+    lastLogin: null
   };
 }
 
 // Sample data
 // Password for all demo users: password123
+// PIN for residents: 1234
+// Sample unit
+const sampleUnit = {
+  _id: new ObjectId(),
+  unitNumber: 'HDB-01',
+  address: '123 Test Street, Singapore 123456',
+  capacity: 4,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
 const sampleUsers = [
-  makeUser('user1', 'user1@example.com', 'resident', 'HDB-01', 'password123'),
-  makeUser('user2', 'user2@example.com', 'resident', 'HDB-01', 'password123'),
+  makeUser('user1', 'user1@example.com', 'resident', sampleUnit._id, 'password123', '1234'),
+  makeUser('user2', 'user2@example.com', 'resident', sampleUnit._id, 'password123', '1234'),
   makeUser('staff1', 'staff1@example.com', 'staff', null, 'password123'),
   makeUser('admin', 'admin@example.com', 'admin', null, 'password123')
 ];
-
-const { ObjectId } = require('mongodb');
 
 const sampleTasks = [
   { 
@@ -110,7 +125,7 @@ const sampleSchedules = [
   {
     _id: new ObjectId(),
     taskId: sampleTasks[0]._id, // Morning Medication
-    userId: null, // Can be linked to specific user if needed
+    userId: sampleUsers[0]._id, // Assign to user1
     type: 'daily',
     time: '08:00',
     days: [1, 2, 3, 4, 5, 6, 7], // 1 = Monday, 7 = Sunday
@@ -121,7 +136,7 @@ const sampleSchedules = [
   {
     _id: new ObjectId(),
     taskId: sampleTasks[1]._id, // Breakfast
-    userId: null,
+    userId: sampleUsers[0]._id, // Assign to user1
     type: 'daily',
     time: '08:30',
     days: [1, 2, 3, 4, 5, 6, 7],
@@ -132,7 +147,7 @@ const sampleSchedules = [
   {
     _id: new ObjectId(),
     taskId: sampleTasks[2]._id, // Brush Teeth
-    userId: null,
+    userId: sampleUsers[0]._id, // Assign to user1
     type: 'daily',
     time: '08:45',
     days: [1, 2, 3, 4, 5, 6, 7],
@@ -143,7 +158,7 @@ const sampleSchedules = [
   {
     _id: new ObjectId(),
     taskId: sampleTasks[3]._id, // Lunch
-    userId: null,
+    userId: sampleUsers[0]._id, // Assign to user1
     type: 'daily',
     time: '12:30',
     days: [1, 2, 3, 4, 5, 6, 7],
@@ -154,7 +169,7 @@ const sampleSchedules = [
   {
     _id: new ObjectId(),
     taskId: sampleTasks[4]._id, // Evening Medication
-    userId: null,
+    userId: sampleUsers[0]._id, // Assign to user1
     type: 'daily',
     time: '20:00',
     days: [1, 2, 3, 4, 5, 6, 7],
@@ -181,9 +196,15 @@ async function seedDatabase() {
     
     // Drop existing collections if they exist (optional, for clean seed)
     await accountDb.collection('users').drop().catch(() => console.log('Users collection does not exist, creating new one...'));
+    await accountDb.collection('units').drop().catch(() => console.log('Units collection does not exist, creating new one...'));
     await taskDb.collection('tasks').drop().catch(() => console.log('Tasks collection does not exist, creating new one...'));
     await taskDb.collection('schedules').drop().catch(() =>console.log('Schedules collection does not exist, creating new one...')
 );
+    
+    // Insert sample unit into Account database
+    const unitsCollection = accountDb.collection('units');
+    await unitsCollection.insertOne(sampleUnit);
+    console.log(`✅ Successfully inserted unit into ${ACCOUNT_DB_NAME} database`);
     
     // Insert sample users into Account database
     const usersCollection = accountDb.collection('users');

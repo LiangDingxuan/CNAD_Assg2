@@ -8,9 +8,10 @@ interface NavTabProps {
   label: string
   to: string
   icon: React.ReactNode
+  badge?: number
 }
 
-function NavTab({ label, to, icon }: NavTabProps) {
+function NavTab({ label, to, icon, badge }: NavTabProps) {
   const location = useLocation()
   const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
 
@@ -18,12 +19,19 @@ function NavTab({ label, to, icon }: NavTabProps) {
     <Link
       to={to}
       className={cn(
-        'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
-        isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+        'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors relative',
+        isActive
+          ? 'bg-primary text-primary-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-accent'
       )}
     >
       {icon}
       {label}
+      {badge && badge > 0 && (
+        <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </Link>
   )
 }

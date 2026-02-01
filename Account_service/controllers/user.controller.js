@@ -18,6 +18,15 @@ function sanitizeUser(user) {
   };
 }
 
+function sanitizeResident(user) {
+  return {
+    id: String(user._id),
+    username: user.username,
+    unitId: user.unitId ? String(user.unitId) : null,
+    isActive: user.isActive,
+  };
+}
+
 async function listUsers(req, res, next) {
   try {
     const filter = {};
@@ -34,6 +43,30 @@ async function listUsers(req, res, next) {
 
     const users = await User.find(filter).sort({ username: 1 }).lean();
     return res.json(users.map(sanitizeUser));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listResidents(req, res, next) {
+  try {
+    // Only return active residents for public access
+    const filter = {
+      role: 'resident',
+      isActive: true
+    };
+
+    // Optional unit filter
+    if (req.query.unitId) {
+      filter.unitId = req.query.unitId;
+    }
+
+    const residents = await User.find(filter)
+      .sort({ username: 1 })
+      .select('username unitId isActive')
+      .lean();
+    
+    return res.json(residents.map(sanitizeResident));
   } catch (err) {
     next(err);
   }
@@ -291,4 +324,4 @@ async function createStaffOrAdmin(req, res, next) {
   }
 }
 
-module.exports = { listUsers, getUser, createUser, updateUser, deleteUser, createStaffOrAdmin };
+module.exports = { listUsers, listResidents, getUser, createUser, updateUser, deleteUser, createStaffOrAdmin };

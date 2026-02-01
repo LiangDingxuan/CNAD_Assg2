@@ -13,6 +13,13 @@ import { EmojiAvatar } from '@/components/resident/EmojiAvatar';
 import { useTabletAuth } from '@/context/TabletAuthContext';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 
+interface ResidentUser {
+  id: string;
+  username: string;
+  unitId?: string;
+  isActive?: boolean;
+}
+
 const PIN_LENGTH = 4;
 
 function NumPad({
@@ -83,14 +90,16 @@ export function PinEntryPage() {
   const [pin, setPin] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ResidentUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const userId = searchParams.get('user') || '';
 
   const { loggedInUsers, verifyPin, error, clearError, tabletConfig } = useTabletAuth();
 
-  // Find the selected user from logged-in users
-  const user = loggedInUsers.find((u) => u.id === userId);
+  // Find the selected user from logged-in users first
+  const user = loggedInUsers.find((u) => u.id === userId) || selectedUser;
 
   // Redirect if user not found or tablet not configured
   useEffect(() => {
@@ -98,6 +107,33 @@ export function PinEntryPage() {
       navigate('/resident');
     }
   }, [tabletConfig, user, loggedInUsers, navigate]);
+
+  // Fetch user details if not found in loggedInUsers
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      if (!userId || loggedInUsers.find(u => u.id === userId)) {
+        return;
+      }
+
+      try {
+        setLoadingUser(true);
+        const response = await fetch(`http://localhost:3001/api/users/residents`);
+        if (response.ok) {
+          const residents = await response.json();
+          const user = residents.find((r: ResidentUser) => r.id === userId);
+          if (user) {
+            setSelectedUser(user);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user details:', err);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    fetchUserDetails();
+  }, [userId, loggedInUsers]);
 
   // Clear errors when component mounts or user changes
   useEffect(() => {
@@ -147,7 +183,7 @@ export function PinEntryPage() {
     navigate('/resident');
   };
 
-  if (!user) {
+  if (!user || loadingUser) {
     return (
       <div className="h-screen overflow-hidden bg-background flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />

@@ -1,10 +1,13 @@
 const express = require('express');
-const { listUsers, getUser, createUser, updateUser, deleteUser, createStaffOrAdmin } = require('../controllers/user.controller');
+const { listUsers, getUser, createUser, updateUser, deleteUser, createStaffOrAdmin, listResidents } = require('../controllers/user.controller');
 const { requireAuth, requireRole } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// All user routes require admin role
+// Public route for fetching residents (for tablet profile selection)
+router.get('/residents', listResidents);
+
+// All other user routes require admin role
 router.use(requireAuth, requireRole(['admin']));
 
 router.get('/', listUsers);

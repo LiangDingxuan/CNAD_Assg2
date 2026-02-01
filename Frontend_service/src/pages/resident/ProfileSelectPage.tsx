@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, Settings } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmojiAvatar } from '@/components/resident/EmojiAvatar';
 import { useTabletAuth, type TabletUser } from '@/context/TabletAuthContext';
+
+interface ResidentUser extends TabletUser {
+  unitId?: string;
+  isActive?: boolean;
+}
 
 interface ProfileCardProps {
   user: TabletUser;
@@ -81,6 +86,8 @@ function NoResidentsLoggedIn() {
 
 export function ProfileSelectPage() {
   const navigate = useNavigate();
+  const [allResidents, setAllResidents] = useState<ResidentUser[]>([]);
+  const [loadingResidents, setLoadingResidents] = useState(false);
   const {
     tabletConfig,
     loggedInUsers,
@@ -98,8 +105,26 @@ export function ProfileSelectPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Refresh profiles on mount
+  // Fetch all residents on mount
   useEffect(() => {
+    const fetchAllResidents = async () => {
+      try {
+        setLoadingResidents(true);
+        const response = await fetch('http://localhost:3001/api/users/residents');
+        if (response.ok) {
+          const users = await response.json();
+          setAllResidents(users);
+        }
+      } catch (err) {
+        console.error('Error fetching residents:', err);
+      } finally {
+        setLoadingResidents(false);
+      }
+    };
+
+    fetchAllResidents();
+    
+    // Also refresh tablet profiles if configured
     if (tabletConfig) {
       refreshProfiles();
     }
@@ -109,7 +134,7 @@ export function ProfileSelectPage() {
     navigate(`/resident/pin?user=${userId}`);
   };
 
-  if (isLoading) {
+  if (isLoading || loadingResidents) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -121,7 +146,10 @@ export function ProfileSelectPage() {
     return <TabletNotConfigured />;
   }
 
-  if (loggedInUsers.length === 0) {
+  // Show all residents, not just logged-in ones
+  const displayUsers = allResidents.length > 0 ? allResidents : loggedInUsers;
+  
+  if (displayUsers.length === 0) {
     return <NoResidentsLoggedIn />;
   }
 
@@ -145,7 +173,7 @@ export function ProfileSelectPage() {
       </div>
 
       <div className="flex gap-8 flex-wrap justify-center">
-        {loggedInUsers.map((user) => (
+        {displayUsers.map((user) => (
           <ProfileCard key={user.id} user={user} onClick={() => handleSelectProfile(user.id)} />
         ))}
       </div>

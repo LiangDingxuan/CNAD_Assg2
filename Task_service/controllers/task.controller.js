@@ -141,7 +141,11 @@ exports.getUserTimetable = async (req, res) => {
     const dayOfWeek = targetDate.getDay() === 0 ? 7 : targetDate.getDay(); // Convert Sunday to 7
     
     const schedules = await Schedule.find({
-      userId: userId,
+      $or: [
+        { userId: userId },  // User-specific schedules
+        { userId: null },   // General schedules for all users
+        { userId: { $exists: false } }  // Schedules without userId field
+      ],
       isActive: true,
       days: { $in: [dayOfWeek] },
       $or: [

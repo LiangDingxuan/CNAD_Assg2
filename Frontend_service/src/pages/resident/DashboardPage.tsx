@@ -10,60 +10,57 @@ import { useTabletAuth } from '@/context/TabletAuthContext';
 import type { AlarmData } from '@/types/alert';
 import type { TabletTask } from '@/types/resident';
 
-// TODO: Replace with real task service API call
-const mockTasks: TabletTask[] = [
-  {
-    id: 't1',
-    name: 'Morning Medication',
-    icon: '💊',
-    scheduledTime: '08:00',
-    completedTime: '08:05',
-    status: 'completed',
-  },
-  {
-    id: 't2',
-    name: 'Breakfast',
-    icon: '🍽️',
-    scheduledTime: '09:00',
-    completedTime: '09:10',
-    status: 'completed',
-  },
-  {
-    id: 't3',
-    name: 'Hygiene Routine',
-    icon: '🪥',
-    scheduledTime: '10:00',
-    completedTime: '10:15',
-    status: 'completed',
-  },
-  {
-    id: 't4',
-    name: 'Lunch',
-    icon: '🍽️',
-    scheduledTime: '12:00',
-    status: 'upcoming',
-  },
-  {
-    id: 't5',
-    name: 'Afternoon Activity',
-    icon: '⏰',
-    scheduledTime: '15:00',
-    status: 'upcoming',
-  },
-  {
-    id: 't6',
-    name: 'Evening Medication',
-    icon: '💊',
-    scheduledTime: '18:00',
-    status: 'upcoming',
-  },
-];
+// Helper function to get icon for task category
+const getTaskIcon = (category: string): string => {
+  const icons: Record<string, string> = {
+    medication: '💊',
+    meals: '🍽️',
+    hygiene: '🪥',
+    chores: '🧹',
+    other: '📋'
+  };
+  return icons[category] || icons.other;
+};
+
+// Helper function to determine task status based on time and completion
+const getTaskStatus = (taskStatus: string, scheduledTime: string): TabletTask['status'] => {
+  if (taskStatus === 'completed') return 'completed';
+  
+  const now = new Date();
+  const [hours, minutes] = scheduledTime.split(':').map(Number);
+  const taskTime = new Date();
+  taskTime.setHours(hours, minutes, 0, 0);
+  
+  const diffMs = taskTime.getTime() - now.getTime();
+  const diffMinutes = diffMs / (1000 * 60);
+  
+  if (diffMinutes < -30) return 'overdue';
+  if (diffMinutes <= 0) return 'due_now';
+  return 'upcoming';
+};
+
+// Helper function to transform schedule data to TabletTask format
+const transformScheduleToTabletTask = (schedule: any): TabletTask => {
+  const task = schedule.taskId;
+  const status = getTaskStatus(task.status || 'pending', schedule.time);
+  
+  return {
+    id: schedule._id,
+    name: task.name,
+    icon: getTaskIcon(task.category),
+    scheduledTime: schedule.time,
+    completedTime: task.status === 'completed' ? schedule.time : undefined,
+    status,
+  };
+};
 
 export function ResidentDashboardPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [alarmOpen, setAlarmOpen] = useState(false);
   const [alarmData, setAlarmData] = useState<AlarmData | null>(null);
-  const [tasks] = useState<TabletTask[]>(mockTasks);
+  const [tasks, setTasks] = useState<TabletTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const { currentUser, isAuthenticated, isLoading, tabletConfig } = useTabletAuth();
@@ -82,6 +79,54 @@ export function ResidentDashboardPage() {
     }
   }, [tabletConfig, isLoading, navigate]);
 
+  // Fetch tasks from task service
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!currentUser) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // For demo purposes, use user1's ID. In real app, this would come from currentUser
+        const userId = currentUser.id || '507f1f77bcf86cd799439011';
+        const today = new Date().toISOString().split('T')[0];
+        
+        const response = await fetch(
+          `http://localhost:3002/api/tasks/user/${userId}/timetable?date=${today}`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch tasks');
+        }
+        
+        const schedules = await response.json();
+        const tabletTasks = schedules.map(transformScheduleToTabletTask);
+        
+        // Sort tasks by scheduled time
+        tabletTasks.sort((a: TabletTask, b: TabletTask) => a.scheduledTime.localeCompare(b.scheduledTime));
+        
+        setTasks(tabletTasks);
+      } catch (err) {
+        console.error('Error fetching tasks:', err);
+        setError((err as Error).message);
+        
+        // Fallback to mock data if API fails
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated && currentUser) {
+      fetchTasks();
+      
+      // Set up polling for real-time updates
+      const interval = setInterval(fetchTasks, 60000); // Refresh every minute
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, currentUser]);
+
   // Simulates a cron-triggered alarm by clicking a task card.
   // TODO: Replace with alert service polling/WebSocket when ready.
   const handleTaskClick = useCallback((task: TabletTask) => {
@@ -93,15 +138,86 @@ export function ResidentDashboardPage() {
     setAlarmOpen(true);
   }, []);
 
-  const handleSnooze = useCallback(() => {
-    // TODO: Call snoozeAlert(scheduleId) when alert service is ready
-    setAlarmOpen(false);
-  }, []);
+  const handleSnooze = useCallback(async () => {
+    if (!alarmData) return;
+    
+    try {
+      // Find the task corresponding to this alarm
+      const task = tasks.find(t => t.name === alarmData.taskName);
+      if (!task) return;
+      
+      // Get the task ID from the schedule (task.id is actually schedule.id)
+      // We need to find the actual task ID from the schedule data
+      const userId = currentUser?.id || '507f1f77bcf86cd799439011';
+      const scheduleResponse = await fetch(`http://localhost:3002/api/tasks/user/${userId}/timetable?date=${new Date().toISOString().split('T')[0]}`);
+      const schedules = await scheduleResponse.json();
+      const schedule = schedules.find((s: any) => s._id === task.id);
+      
+      if (!schedule || !schedule.taskId?._id) {
+        throw new Error('Task not found');
+      }
+      
+      // Update task status to snoozed
+      const response = await fetch(`http://localhost:3002/api/tasks/${schedule.taskId._id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'snoozed' }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to snooze task');
+      }
+      
+      // Refresh tasks
+      window.location.reload();
+    } catch (err) {
+      console.error('Error snoozing task:', err);
+    } finally {
+      setAlarmOpen(false);
+    }
+  }, [alarmData, tasks]);
 
-  const handleComplete = useCallback(() => {
-    // TODO: Call completeAlert(scheduleId) when alert service is ready
-    setAlarmOpen(false);
-  }, []);
+  const handleComplete = useCallback(async () => {
+    if (!alarmData) return;
+    
+    try {
+      // Find the task corresponding to this alarm
+      const task = tasks.find(t => t.name === alarmData.taskName);
+      if (!task) return;
+      
+      // Get the task ID from the schedule (task.id is actually schedule.id)
+      const userId = currentUser?.id || '507f1f77bcf86cd799439011';
+      const scheduleResponse = await fetch(`http://localhost:3002/api/tasks/user/${userId}/timetable?date=${new Date().toISOString().split('T')[0]}`);
+      const schedules = await scheduleResponse.json();
+      const schedule = schedules.find((s: any) => s._id === task.id);
+      
+      if (!schedule || !schedule.taskId?._id) {
+        throw new Error('Task not found');
+      }
+      
+      // Update task status to completed
+      const response = await fetch(`http://localhost:3002/api/tasks/${schedule.taskId._id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to complete task');
+      }
+      
+      // Refresh tasks
+      window.location.reload();
+    } catch (err) {
+      console.error('Error completing task:', err);
+    } finally {
+      setAlarmOpen(false);
+    }
+  }, [alarmData, tasks]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -110,7 +226,7 @@ export function ResidentDashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="h-screen overflow-hidden bg-background flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
@@ -120,6 +236,17 @@ export function ResidentDashboardPage() {
 
   if (!currentUser) {
     return null;
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen overflow-hidden bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">Error loading tasks</p>
+          <p className="text-sm text-gray-500">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   const completedTasks = tasks.filter((t) => t.status === 'completed');
