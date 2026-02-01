@@ -7,6 +7,11 @@ const taskSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  userId: {
+    type: String,
+    required: true,
+    index: true
+  },
   description: {
     type: String,
     required: true
@@ -15,6 +20,10 @@ const taskSchema = new mongoose.Schema({
     type: String,
     enum: ['hygiene', 'medication', 'meals', 'chores', 'other'],
     default: 'other'
+  },
+  scheduledTime: {
+    type: String,
+    required: true
   },
   status: {
     type: String,

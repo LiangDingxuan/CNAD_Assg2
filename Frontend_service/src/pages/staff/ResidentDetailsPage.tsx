@@ -1,11 +1,14 @@
 import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Flame, Trophy, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TaskTimeline } from '@/components/staff/TaskTimeline'
 import { TaskList } from '@/components/staff/TaskList'
-import { getResidentById, getTasksForResident } from '@/data/mockResidents'
+import { listTasks } from '@/services/taskService'
+import * as accountService from '@/services/accountService'
+import type { Task, Resident } from '@/types/staff'
 
 interface StatCardProps {
   label: string
@@ -29,13 +32,73 @@ function StatCard({ label, value, icon, suffix }: StatCardProps) {
 
 export function ResidentDetailsPage() {
   const { id } = useParams<{ id: string }>()
-  const resident = getResidentById(id!)
-  const tasks = getTasksForResident(id!)
+  const [resident, setResident] = useState<Resident | null>(null)
+  const [residentError, setResidentError] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [tasksError, setTasksError] = useState<string | null>(null)
 
-  if (!resident) {
+  useEffect(() => {
+    let isMounted = true
+    async function loadResident() {
+      if (!id) return
+      try {
+        const [user, units] = await Promise.all([
+          accountService.getUser(id),
+          accountService.listUnits({ isActive: true })
+        ])
+        if (!isMounted) return
+        const unitMap = new Map(units.map((unit) => [unit.id, unit.unitNumber]))
+
+        const mapped: Resident = {
+          id: user.id,
+          name: user.username,
+          unit: user.unitId ? `Unit ${unitMap.get(user.unitId) || user.unitId}` : 'Unassigned',
+          status: 'good',
+          tasksCompleted: 0,
+          tasksTotal: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalPoints: 0,
+          badges: []
+        }
+        setResident(mapped)
+        setResidentError(null)
+      } catch (err: any) {
+        if (!isMounted) return
+        setResidentError(err?.message || 'Resident not found')
+      }
+    }
+
+    async function loadTasks() {
+      if (!id) return
+      try {
+        const data = await listTasks(id)
+        if (!isMounted) return
+        const mapped: Task[] = data.map((item) => ({
+          id: item._id || item.id || '',
+          name: item.name,
+          scheduledTime: item.scheduledTime,
+          status: (item.status as Task['status']) || 'pending'
+        }))
+        setTasks(mapped)
+        setTasksError(null)
+      } catch (err: any) {
+        if (!isMounted) return
+        setTasksError(err?.message || 'Failed to load tasks')
+      }
+    }
+
+    loadResident()
+    loadTasks()
+    return () => {
+      isMounted = false
+    }
+  }, [id])
+
+  if (!resident || residentError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Resident not found</p>
+        <p className="text-muted-foreground">{residentError || 'Resident not found'}</p>
       </div>
     )
   }
@@ -100,8 +163,14 @@ export function ResidentDetailsPage() {
             <CardTitle>Today's Task Timeline</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <TaskTimeline tasks={tasks} />
-            <TaskList tasks={tasks} />
+            {tasksError ? (
+              <p className="text-sm text-destructive">{tasksError}</p>
+            ) : (
+              <>
+                <TaskTimeline tasks={tasks} />
+                <TaskList tasks={tasks} />
+              </>
+            )}
           </CardContent>
         </Card>
       </main>

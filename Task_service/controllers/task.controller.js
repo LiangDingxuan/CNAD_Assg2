@@ -6,23 +6,25 @@ const Alert = require('../models/alert.model');
 // Get all tasks
 exports.getAllTasks = async (req, res) => {
   try {
+    const filter = {}; // no filter by default
+
     const { userId, status, category } = req.query;
-    const filter = {};
-    
+
     if (userId) filter.assignedTo = userId;
     if (status) filter.status = status;
     if (category) filter.category = category;
-    
+
     const tasks = await Task.find(filter)
       .populate('assignedTo', 'username email')
       .populate('createdBy', 'username email')
       .sort({ createdAt: -1 });
-    
+
     res.status(200).json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // Create a new task (for staff)
 exports.createTask = async (req, res) => {
